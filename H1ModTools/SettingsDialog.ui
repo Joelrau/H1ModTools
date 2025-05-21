@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+  <class>SettingsDialog</class>
+  <widget class="QDialog" name="SettingsDialog">
+    <property name="geometry">
+      <rect>
+        <x>0</x>
+        <y>0</y>
+        <width>720</width>
+        <height>220</height>
+      </rect>
+    </property>
+    <property name="windowTitle">
+      <string>Settings</string>
+    </property>
+    <layout class="QVBoxLayout" name="verticalLayout">
+
+      <!-- H1 Path -->
+      <item>
+        <layout class="QHBoxLayout" name="h1Layout">
+          <item>
+            <widget class="QLabel" name="labelH1">
+              <property name="text">
+                <string>H1 Path:</string>
+              </property>
+              <property name="minimumSize">
+                <size>
+                  <width>70</width>
+                  <height>0</height>
+                </size>
+              </property>
+              <property name="maximumSize">
+                <size>
+                  <width>70</width>
+                  <height>16777215</height>
+                </size>
+              </property>
+            </widget>
+          </item>
+          <item>
+            <widget class="QLineEdit" name="lineEditH1"/>
+          </item>
+          <item>
+            <widget class="QPushButton" name="buttonBrowseH1">
+              <property name="text">
+                <string>Browse...</string>
+              </property>
+            </widget>
+          </item>
+        </layout>
+      </item>
+
+      <!-- IW3 Path -->
+      <item>
+        <layout class="QHBoxLayout" name="iw3Layout">
+          <item>
+            <widget class="QLabel" name="labelIW3">
+              <property name="text">
+                <string>IW3 Path:</string>
+              </property>
+              <property name="minimumSize">
+                <size>
+                  <width>70</width>
+                  <height>0</height>
+                </size>
+              </property>
+              <property name="maximumSize">
+                <size>
+                  <width>70</width>
+                  <height>16777215</height>
+                </size>
+              </property>
+            </widget>
+          </item>
+          <item>
+            <widget class="QLineEdit" name="lineEditIW3"/>
+          </item>
+          <item>
+            <widget class="QPushButton" name="buttonBrowseIW3">
+              <property name="text">
+                <string>Browse...</string>
+              </property>
+            </widget>
+          </item>
+        </layout>
+      </item>
+
+      <!-- IW4 Path -->
+      <item>
+        <layout class="QHBoxLayout" name="iw4Layout">
+          <item>
+            <widget class="QLabel" name="labelIW4">
+              <property name="text">
+                <string>IW4 Path:</string>
+              </property>
+              <property name="minimumSize">
+                <size>
+                  <width>70</width>
+                  <height>0</height>
+                </size>
+              </property>
+              <property name="maximumSize">
+                <size>
+                  <width>70</width>
+                  <height>16777215</height>
+                </size>
+              </property>
+            </widget>
+          </item>
+          <item>
+            <widget class="QLineEdit" name="lineEditIW4"/>
+          </item>
+          <item>
+            <widget class="QPushButton" name="buttonBrowseIW4">
+              <property name="text">
+                <string>Browse...</string>
+              </property>
+            </widget>
+          </item>
+        </layout>
+      </item>
+
+      <!-- IW5 Path -->
+      <item>
+        <layout class="QHBoxLayout" name="iw5Layout">
+          <item>
+            <widget class="QLabel" name="labelIW5">
+              <property name="text">
+                <string>IW5 Path:</string>
+              </property>
+              <property name="minimumSize">
+                <size>
+                  <width>70</width>
+                  <height>0</height>
+                </size>
+              </property>
+              <property name="maximumSize">
+                <size>
+                  <width>70</width>
+                  <height>16777215</height>
+                </size>
+              </property>
+            </widget>
+          </item>
+          <item>
+            <widget class="QLineEdit" name="lineEditIW5"/>
+          </item>
+          <item>
+            <widget class="QPushButton" name="buttonBrowseIW5">
+              <property name="text">
+                <string>Browse...</string>
+              </property>
+            </widget>
+          </item>
+        </layout>
+      </item>
+
+      <!-- Spacer -->
+      <item>
+        <spacer name="verticalSpacer">
+          <property name="orientation">
+            <enum>Qt::Orientation::Vertical</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+            <size>
+              <width>20</width>
+              <height>40</height>
+            </size>
+          </property>
+        </spacer>
+      </item>
+
+      <!-- Buttons -->
+      <item>
+        <widget class="QDialogButtonBox" name="buttonBox">
+          <property name="orientation">
+            <enum>Qt::Orientation::Horizontal</enum>
+          </property>
+          <property name="standardButtons">
+            <set>QDialogButtonBox::Ok|QDialogButtonBox::Cancel</set>
+          </property>
+        </widget>
+      </item>
+
+    </layout>
+  </widget>
+  <resources/>
+  <connections/>
+</ui>

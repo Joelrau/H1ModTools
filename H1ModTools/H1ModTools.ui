@@ -1,0 +1,280 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>H1ModToolsClass</class>
+ <widget class="QMainWindow" name="H1ModToolsClass">
+  <property name="enabled">
+   <bool>true</bool>
+  </property>
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>720</width>
+    <height>800</height>
+   </rect>
+  </property>
+  <property name="sizePolicy">
+   <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+    <horstretch>0</horstretch>
+    <verstretch>0</verstretch>
+   </sizepolicy>
+  </property>
+  <property name="windowTitle">
+   <string>H1ModTools</string>
+  </property>
+  <property name="autoFillBackground">
+   <bool>false</bool>
+  </property>
+  <widget class="QWidget" name="centralWidget">
+   <layout class="QGridLayout" name="gridLayout">
+    <property name="sizeConstraint">
+     <enum>QLayout::SizeConstraint::SetDefaultConstraint</enum>
+    </property>
+    <item row="1" column="2" colspan="2">
+     <layout class="QHBoxLayout" name="horizontalLayout">
+      <item>
+       <widget class="QPushButton" name="settings_button">
+        <property name="text">
+         <string>Preferences</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="tools_button">
+        <property name="text">
+         <string>Tools</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+    <item row="13" column="2">
+     <widget class="QTabWidget" name="tabWidget">
+      <property name="enabled">
+       <bool>true</bool>
+      </property>
+      <property name="currentIndex">
+       <number>0</number>
+      </property>
+      <widget class="QWidget" name="tabH1">
+       <attribute name="icon">
+        <iconset resource="H1ModTools.qrc">
+         <normaloff>:/H1ModTools/Resources/h1_icon.png</normaloff>:/H1ModTools/Resources/h1_icon.png</iconset>
+       </attribute>
+       <attribute name="title">
+        <string>H1</string>
+       </attribute>
+      </widget>
+      <widget class="QWidget" name="tabIW3">
+       <attribute name="icon">
+        <iconset resource="H1ModTools.qrc">
+         <normaloff>:/H1ModTools/Resources/iw3_icon.png</normaloff>:/H1ModTools/Resources/iw3_icon.png</iconset>
+       </attribute>
+       <attribute name="title">
+        <string>IW3</string>
+       </attribute>
+      </widget>
+      <widget class="QWidget" name="tabIW4">
+       <attribute name="icon">
+        <iconset resource="H1ModTools.qrc">
+         <normaloff>:/H1ModTools/Resources/iw4_icon.png</normaloff>:/H1ModTools/Resources/iw4_icon.png</iconset>
+       </attribute>
+       <attribute name="title">
+        <string>IW4</string>
+       </attribute>
+      </widget>
+      <widget class="QWidget" name="tabIW5">
+       <attribute name="icon">
+        <iconset resource="H1ModTools.qrc">
+         <normaloff>:/H1ModTools/Resources/iw5_icon.png</normaloff>:/H1ModTools/Resources/iw5_icon.png</iconset>
+       </attribute>
+       <attribute name="title">
+        <string>IW5</string>
+       </attribute>
+      </widget>
+     </widget>
+    </item>
+    <item row="13" column="3">
+     <layout class="QVBoxLayout" name="verticalLayout">
+      <property name="sizeConstraint">
+       <enum>QLayout::SizeConstraint::SetDefaultConstraint</enum>
+      </property>
+      <property name="bottomMargin">
+       <number>0</number>
+      </property>
+      <item>
+       <spacer name="horizontalSpacer_4">
+        <property name="orientation">
+         <enum>Qt::Orientation::Horizontal</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>40</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item>
+       <widget class="QPushButton" name="exportButton">
+        <property name="text">
+         <string>Export</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <spacer name="horizontalSpacer_3">
+        <property name="orientation">
+         <enum>Qt::Orientation::Vertical</enum>
+        </property>
+        <property name="sizeType">
+         <enum>QSizePolicy::Policy::Expanding</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>20</width>
+          <height>40</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item>
+       <widget class="QPushButton" name="generateCSVButton">
+        <property name="enabled">
+         <bool>true</bool>
+        </property>
+        <property name="text">
+         <string>1. Generate csv</string>
+        </property>
+        <property name="checkable">
+         <bool>false</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="compileReflectionsButton">
+        <property name="text">
+         <string>2. Compile Reflections</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="buildZoneButton">
+        <property name="text">
+         <string>3. Build Zone</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="RunMapButton">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="sizeIncrement">
+         <size>
+          <width>0</width>
+          <height>0</height>
+         </size>
+        </property>
+        <property name="baseSize">
+         <size>
+          <width>0</width>
+          <height>0</height>
+         </size>
+        </property>
+        <property name="layoutDirection">
+         <enum>Qt::LayoutDirection::LeftToRight</enum>
+        </property>
+        <property name="text">
+         <string>4. Run Selected Map</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <layout class="QVBoxLayout" name="verticalLayout_2">
+        <property name="spacing">
+         <number>0</number>
+        </property>
+        <item>
+         <widget class="QCheckBox" name="cheatsCheckBox">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Minimum" vsizetype="Minimum">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="text">
+           <string>Cheats</string>
+          </property>
+          <property name="checked">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QCheckBox" name="developerCheckBox">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Minimum" vsizetype="Minimum">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="layoutDirection">
+           <enum>Qt::LayoutDirection::LeftToRight</enum>
+          </property>
+          <property name="text">
+           <string>Developer</string>
+          </property>
+          <property name="checked">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+     </layout>
+    </item>
+    <item row="16" column="2" colspan="2">
+     <widget class="QTextEdit" name="outputBuffer"/>
+    </item>
+   </layout>
+  </widget>
+ </widget>
+ <layoutdefault spacing="6" margin="12"/>
+ <tabstops>
+  <tabstop>settings_button</tabstop>
+  <tabstop>tools_button</tabstop>
+  <tabstop>tabWidget</tabstop>
+  <tabstop>generateCSVButton</tabstop>
+  <tabstop>compileReflectionsButton</tabstop>
+  <tabstop>buildZoneButton</tabstop>
+  <tabstop>RunMapButton</tabstop>
+  <tabstop>cheatsCheckBox</tabstop>
+  <tabstop>developerCheckBox</tabstop>
+  <tabstop>outputBuffer</tabstop>
+ </tabstops>
+ <resources>
+  <include location="H1ModTools.qrc"/>
+ </resources>
+ <connections/>
+ <designerdata>
+  <property name="gridDeltaX">
+   <number>10</number>
+  </property>
+  <property name="gridDeltaY">
+   <number>10</number>
+  </property>
+  <property name="gridSnapX">
+   <bool>true</bool>
+  </property>
+  <property name="gridSnapY">
+   <bool>true</bool>
+  </property>
+  <property name="gridVisible">
+   <bool>true</bool>
+  </property>
+ </designerdata>
+</ui>
