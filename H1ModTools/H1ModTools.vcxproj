@@ -95,7 +95,6 @@
     <ClCompile Include="Globals.cpp" />
     <ClCompile Include="LogRedirector.cpp" />
     <ClCompile Include="SettingsDialog.cpp" />
-    <ClCompile Include="Utils\filesystem.cpp" />
     <QtRcc Include="H1ModTools.qrc" />
     <QtUic Include="H1ModTools.ui" />
     <QtMoc Include="H1ModTools.h" />
@@ -119,9 +118,6 @@
   <ItemGroup>
     <QtMoc Include="LogRedirector.h" />
     <ClInclude Include="Globals.h" />
-    <ClInclude Include="Utils\filesystem.hpp" />
-    <ClInclude Include="Utils\json.hpp" />
-    <ClInclude Include="Utils\Utils.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Condition="Exists('$(QtMsBuild)\qt.targets')">

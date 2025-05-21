@@ -21,9 +21,6 @@
       <UniqueIdentifier>{639EADAA-A684-42e4-A9AD-28FC9BCB8F7C}</UniqueIdentifier>
       <Extensions>ts</Extensions>
     </Filter>
-    <Filter Include="Utils">
-      <UniqueIdentifier>{82aa7540-c4af-4e6c-b77e-bd67ba1d5c1c}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
     <QtRcc Include="H1ModTools.qrc">
@@ -46,9 +43,6 @@
     <ClCompile Include="SettingsDialog.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Utils\filesystem.cpp">
-      <Filter>Utils</Filter>
-    </ClCompile>
     <ClCompile Include="LogRedirector.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -70,15 +64,6 @@
     </QtMoc>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Utils\filesystem.hpp">
-      <Filter>Utils</Filter>
-    </ClInclude>
-    <ClInclude Include="Utils\json.hpp">
-      <Filter>Utils</Filter>
-    </ClInclude>
-    <ClInclude Include="Utils\Utils.hpp">
-      <Filter>Utils</Filter>
-    </ClInclude>
     <ClInclude Include="Globals.h">
       <Filter>Header Files</Filter>
     </ClInclude>
