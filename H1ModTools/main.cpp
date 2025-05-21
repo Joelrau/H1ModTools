@@ -18,7 +18,7 @@ int main(int argc, char *argv[])
         font-size: 9.0pt;
     }
 
-    /* QPushButton default */
+    /* QPushButton */
     QPushButton {
         background-color: #2d2d2d;
         border: 1px solid #444;
@@ -100,6 +100,45 @@ int main(int argc, char *argv[])
     QTabBar::tab:disabled {
         background-color: #3a3a3a;
         color: #777;
+    }
+
+    /* QCheckBox */
+    QCheckBox {
+    color: #e0e0e0;
+    spacing: 6px;
+    }
+
+    /* Disabled state */
+    QCheckBox:disabled {
+        color: #777;
+        opacity: 0.7;
+    }
+
+    /* Ensure indicator inherits disabled state */
+    QCheckBox::indicator:disabled {
+        opacity: inherit;
+    }
+
+    /* QLabel */
+    QLabel:disabled {
+        color: #777;
+    }
+
+    /* QGroupBox */
+    QGroupBox {
+        border: 1px solid #444;
+        border-radius: 5px;
+        margin-top: 6px;
+    }
+    QGroupBox::title {
+        subcontrol-origin: margin;
+        subcontrol-position: top left;
+        padding: 0 4px;
+        color: #ff8800;
+    }
+    QGroupBox:disabled {
+        color: #777;
+        border-color: #333;
     }
 
     /* QDialogButtonBox QPushButton */

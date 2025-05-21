@@ -48,9 +48,9 @@ void LogRedirector::readFromPipe()
         buffer[bytes] = '\0';
         QString text = QString::fromLocal8Bit(buffer).trimmed();
 
-        QColor color = Qt::black;
+        QColor color = Qt::white;
         if (text.contains("[ Debug ]", Qt::CaseInsensitive))
-            color = Qt::darkGray;
+            color = Qt::cyan;
         else if (text.contains("[ Warning ]", Qt::CaseInsensitive))
             color = Qt::yellow;
         else if (text.contains("[ Critical ]", Qt::CaseInsensitive) || text.contains("[ Error ]", Qt::CaseInsensitive))
@@ -95,9 +95,9 @@ void LogRedirector::qtMessageHandler(QtMsgType type, const QMessageLogContext&, 
     fflush(stdout);
 
     if (instance && instance->outputEdit) {
-        QColor color = Qt::black;
+        QColor color = Qt::white;
         switch (type) {
-        case QtDebugMsg:    color = Qt::darkGray; break;
+        case QtDebugMsg:    color = Qt::cyan; break;
         case QtWarningMsg:  color = Qt::yellow; break;
         case QtCriticalMsg: color = Qt::red; break;
         case QtFatalMsg:    color = Qt::darkRed; break;
