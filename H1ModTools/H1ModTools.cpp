@@ -6,17 +6,17 @@
 H1ModTools::H1ModTools(QWidget *parent)
     : QMainWindow(parent)
 {
-    loadGlobals();
-
     ui.setupUi(this);
 
     LogRedirector* logger = new LogRedirector(ui.outputBuffer);
     logger->installQtMessageHandler();
 
-    connect(ui.tabWidget, &QTabWidget::currentChanged, this, &H1ModTools::updateVisibility);
+    loadGlobals();
 
     setupListWidgets(); // Once at init
     populateLists();
+
+    connect(ui.tabWidget, &QTabWidget::currentChanged, this, &H1ModTools::updateVisibility);
     updateVisibility();
 }
 
@@ -127,7 +127,6 @@ void H1ModTools::updateVisibility()
     ui.generateCSVButton->setEnabled(canCompile);
     ui.compileReflectionsButton->setEnabled(canCompile);
     ui.buildZoneButton->setEnabled(canCompile);
-    ui.RunMapButton->setEnabled(canCompile);
     ui.RunMapButton->setEnabled(canCompile);
     ui.cheatsCheckBox->setEnabled(canCompile);
     ui.developerCheckBox->setEnabled(canCompile);
