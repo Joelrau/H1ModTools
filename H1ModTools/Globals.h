@@ -15,6 +15,9 @@
 #include <QMessageBox>
 
 #include <QListWidget>
+#include <QTreeWidget>
+
+#include <QMenu>
 
 struct Globals_e
 {

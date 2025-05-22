@@ -75,6 +75,26 @@ int main(int argc, char *argv[])
         color: #000;
     }
 
+    /* QTreeWidget */
+    QTreeWidget {
+        background-color: #2b2b2b;
+        border: 1px solid #555;
+        padding: 4px;
+        color: #e0e0e0;
+    }
+    QTreeWidget:disabled {
+        background-color: #3a3a3a;
+        color: #777;
+    }
+    QTreeWidget::item:hover {
+        background-color: #ff8800;
+        color: #000;
+    }
+    QTreeWidget::item:selected {
+        background-color: #ff8800;
+        color: #000;
+    }
+
     /* QTabWidget */
     QTabWidget::pane {
         border: 1px solid #444;
@@ -104,17 +124,13 @@ int main(int argc, char *argv[])
 
     /* QCheckBox */
     QCheckBox {
-    color: #e0e0e0;
-    spacing: 6px;
+        color: #e0e0e0;
+        spacing: 6px;
     }
-
-    /* Disabled state */
     QCheckBox:disabled {
         color: #777;
         opacity: 0.7;
     }
-
-    /* Ensure indicator inherits disabled state */
     QCheckBox::indicator:disabled {
         opacity: inherit;
     }
