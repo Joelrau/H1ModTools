@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QStyleFactory>
 #include <QString>
 #include <QProcess>
 #include <QObject>
@@ -13,11 +14,10 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QMessageBox>
-
 #include <QListWidget>
 #include <QTreeWidget>
-
 #include <QMenu>
+#include <QDesktopServices>
 
 struct Globals_e
 {

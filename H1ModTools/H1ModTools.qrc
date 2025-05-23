@@ -4,5 +4,6 @@
         <file>Resources/iw4_icon.png</file>
         <file>Resources/iw5_icon.png</file>
         <file>Resources/h1_icon.png</file>
+        <file>Styles/main.qss</file>
     </qresource>
 </RCC>

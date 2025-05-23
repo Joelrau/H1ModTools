@@ -31,7 +31,11 @@
      <enum>QLayout::SizeConstraint::SetDefaultConstraint</enum>
     </property>
     <item row="15" column="2" colspan="2">
-     <widget class="QTextEdit" name="outputBuffer"/>
+     <widget class="QTextEdit" name="outputBuffer">
+      <property name="lineWrapMode">
+       <enum>QTextEdit::LineWrapMode::NoWrap</enum>
+      </property>
+     </widget>
     </item>
     <item row="12" column="2">
      <widget class="QTabWidget" name="tabWidget">
@@ -82,14 +86,14 @@
     <item row="1" column="2" colspan="2">
      <layout class="QHBoxLayout" name="horizontalLayout">
       <item>
-       <widget class="QPushButton" name="settings_button">
+       <widget class="QPushButton" name="settingsButton">
         <property name="text">
          <string>Preferences</string>
         </property>
        </widget>
       </item>
       <item>
-       <widget class="QPushButton" name="tools_button">
+       <widget class="QPushButton" name="toolsButton">
         <property name="text">
          <string>Tools</string>
         </property>
@@ -171,7 +175,7 @@
         </widget>
        </item>
        <item>
-        <widget class="QPushButton" name="RunMapButton">
+        <widget class="QPushButton" name="runMapButton">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
            <horstretch>0</horstretch>
@@ -248,11 +252,11 @@
  </widget>
  <layoutdefault spacing="6" margin="12"/>
  <tabstops>
-  <tabstop>settings_button</tabstop>
-  <tabstop>tools_button</tabstop>
+  <tabstop>settingsButton</tabstop>
+  <tabstop>toolsButton</tabstop>
   <tabstop>tabWidget</tabstop>
   <tabstop>buildZoneButton</tabstop>
-  <tabstop>RunMapButton</tabstop>
+  <tabstop>runMapButton</tabstop>
   <tabstop>cheatsCheckBox</tabstop>
   <tabstop>developerCheckBox</tabstop>
   <tabstop>outputBuffer</tabstop>

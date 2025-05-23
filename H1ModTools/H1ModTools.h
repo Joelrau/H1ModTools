@@ -26,8 +26,10 @@ private:
     void loadGlobals();
 
 private slots:
-    void on_settings_button_clicked();
+    void on_buildZoneButton_clicked();
+    void on_settingsButton_clicked();
     void onTreeContextMenuRequested(const QPoint& pos);
+    void onOutputBufferContextMenu(const QPoint& pos);
 
 private:
     Ui::H1ModToolsClass ui;

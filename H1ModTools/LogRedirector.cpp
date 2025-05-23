@@ -13,7 +13,7 @@
 LogRedirector* LogRedirector::instance = nullptr;
 
 LogRedirector::LogRedirector(QTextEdit* targetEdit, QObject* parent)
-    : QObject(parent), outputEdit(targetEdit)
+    : QObject(parent), outputEdit(targetEdit), notifier(nullptr)
 {
     Q_ASSERT(outputEdit);
     outputEdit->setReadOnly(true);
@@ -33,8 +33,12 @@ void LogRedirector::setupPipe()
         return;
     }
 
+    // Redirect stdout and stderr to the pipe's write end
     _dup2(pipeFd[1], _fileno(stdout));
     _dup2(pipeFd[1], _fileno(stderr));
+
+    // Close the duplicate write fd (optional cleanup)
+    _close(pipeFd[1]);
 
     notifier = new QSocketNotifier(pipeFd[0], QSocketNotifier::Read, this);
     connect(notifier, &QSocketNotifier::activated, this, &LogRedirector::readFromPipe);
@@ -43,11 +47,16 @@ void LogRedirector::setupPipe()
 void LogRedirector::readFromPipe()
 {
     char buffer[1024];
-    int bytes = _read(pipeFd[0], buffer, sizeof(buffer) - 1);
-    if (bytes > 0) {
-        buffer[bytes] = '\0';
-        QString text = QString::fromLocal8Bit(buffer).trimmed();
+    while (true) {
+        int bytes = _read(pipeFd[0], buffer, sizeof(buffer) - 1);
+        if (bytes <= 0)
+            break;
 
+        buffer[bytes] = '\0';
+
+        QString text = QString::fromLocal8Bit(buffer);
+
+        // Determine color based on message content
         QColor color = Qt::white;
         if (text.contains("[ Debug ]", Qt::CaseInsensitive))
             color = Qt::cyan;
@@ -64,13 +73,21 @@ void LogRedirector::readFromPipe()
 
 void LogRedirector::appendColoredText(const QString& msg, const QColor& color)
 {
+    // Use queued invoke to safely update UI from the pipe notifier's thread
     QMetaObject::invokeMethod(outputEdit, [=]() {
         QTextCharFormat fmt;
         fmt.setForeground(color);
+
         QTextCursor cursor = outputEdit->textCursor();
         cursor.movePosition(QTextCursor::End);
-        cursor.insertText(msg + "\n", fmt);
+        cursor.insertText(msg, fmt);
+
+        // Add newline if missing to keep formatting consistent
+        if (!msg.endsWith('\n'))
+            cursor.insertText("\n");
+
         outputEdit->setTextCursor(cursor);
+        outputEdit->ensureCursorVisible();
     });
 }
 
@@ -91,6 +108,8 @@ void LogRedirector::qtMessageHandler(QtMsgType type, const QMessageLogContext&, 
     }
 
     QString full = prefix + msg;
+
+    // Print to stdout/stderr explicitly and flush immediately
     fprintf(stdout, "%s\n", full.toUtf8().constData());
     fflush(stdout);
 
@@ -102,7 +121,6 @@ void LogRedirector::qtMessageHandler(QtMsgType type, const QMessageLogContext&, 
         case QtCriticalMsg: color = Qt::red; break;
         case QtFatalMsg:    color = Qt::darkRed; break;
         }
-
         instance->appendColoredText(full, color);
     }
 }

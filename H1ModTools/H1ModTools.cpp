@@ -2,13 +2,34 @@
 
 #include "SettingsDialog.h"
 
+void setupStyle()
+{
+    QFile file(":/H1ModTools/Styles/main.qss");
+    if (!file.open(QFile::ReadOnly | QFile::Text)) {
+        qWarning() << "Failed to open stylesheet resource";
+
+        QApplication::setStyle(QStyleFactory::create("Fusion"));
+    }
+    else
+    {
+        QString styleSheet = QString::fromUtf8(file.readAll());
+        qApp->setStyleSheet(styleSheet);
+    }
+}
+
 H1ModTools::H1ModTools(QWidget *parent)
     : QMainWindow(parent)
 {
+    setupStyle();
+
     ui.setupUi(this);
 
     logger = std::make_unique<LogRedirector>(ui.outputBuffer);
     logger->installQtMessageHandler();
+
+    ui.outputBuffer->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(ui.outputBuffer, &QWidget::customContextMenuRequested,
+        this, &H1ModTools::onOutputBufferContextMenu);
 
     loadGlobals();
 
@@ -22,7 +43,7 @@ H1ModTools::H1ModTools(QWidget *parent)
 H1ModTools::~H1ModTools()
 {}
 
-void H1ModTools::on_settings_button_clicked() {
+void H1ModTools::on_settingsButton_clicked() {
     SettingsDialog dlg(this);
     if (dlg.exec() == QDialog::Accepted) {
         populateLists();
@@ -31,6 +52,7 @@ void H1ModTools::on_settings_button_clicked() {
 
 QString findGameFolderInAllDrives(const QString& folderName) {
     const QStringList potentialSteamPaths = {
+        "Program Files/Steam/steamapps/common/",
         "Program Files (x86)/Steam/steamapps/common/",
         "SteamLibrary/steamapps/common/",
     };
@@ -112,11 +134,12 @@ void H1ModTools::setupListWidgets()
     connect(treeWidgetH1, &QTreeWidget::currentItemChanged, this,
         [this](QTreeWidgetItem* current, QTreeWidgetItem* /*previous*/) {
         if (current && current->parent() != nullptr) {  // Ignore root items
-            qDebug() << "Current item:" << current->text(0);
+            const auto name = QFileInfo(current->text(0)).completeBaseName();
+            qDebug() << "Current item:" << name;
 
-            const bool isMap = H1_isMap(current->text(0));
+            const bool isMap = H1_isMap(name);
             ui.compileReflectionsButton->setEnabled(isMap);
-            ui.RunMapButton->setEnabled(isMap);
+            ui.runMapButton->setEnabled(isMap);
             ui.cheatsCheckBox->setEnabled(isMap);
             ui.developerCheckBox->setEnabled(isMap);
         }
@@ -127,21 +150,24 @@ void H1ModTools::populateListH1(QTreeWidget* tree, const QString& path)
 {
     tree->clear();
 
-    QDir zonetoolDir(path + "/zonetool");
-    if (zonetoolDir.exists()) {
-        QTreeWidgetItem* root = new QTreeWidgetItem(tree);
-        root->setText(0, QString("zonetool"));
-        QFont boldFont = root->font(0);
-        boldFont.setBold(true);
-        root->setFont(0, boldFont);
-        root->setFlags(Qt::ItemIsEnabled);
+    QDir zoneSourceDir(path + "/zone_source");
+    if (!zoneSourceDir.exists()) return;
 
-        QFileInfoList dirs = zonetoolDir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot);
-        for (const QFileInfo& dirInfo : dirs) {
-            QTreeWidgetItem* item = new QTreeWidgetItem(root);
-            item->setText(0, dirInfo.fileName());
-            item->setData(0, Qt::UserRole, dirInfo.absoluteFilePath()); // Use folder directly
-        }
+    QTreeWidgetItem* root = new QTreeWidgetItem(tree);
+    root->setText(0, QString("zone_source"));
+    QFont boldFont = root->font(0);
+    boldFont.setBold(true);
+    root->setFont(0, boldFont);
+    root->setFlags(Qt::ItemIsEnabled);
+
+    QStringList filters;
+    filters << "*.csv";
+
+    QFileInfoList csvFiles = zoneSourceDir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks | QDir::NoDotAndDotDot, QDir::Name | QDir::IgnoreCase);
+    for (const QFileInfo& fileInfo : csvFiles) {
+        QTreeWidgetItem* fileItem = new QTreeWidgetItem(root);
+        fileItem->setText(0, fileInfo.fileName());
+        fileItem->setData(0, Qt::UserRole, fileInfo.absoluteFilePath());
     }
 
     tree->expandAll();
@@ -160,7 +186,7 @@ void H1ModTools::populateListIW(QTreeWidget* tree, const QString& path)
     QDir zoneBaseDir(path + "/zone");
     if (zoneBaseDir.exists()) {
         for (const QString& lang : languageFolders) {
-            QDir langDir(zoneBaseDir.filePath(lang));
+            QDir langDir(zoneBaseDir.absoluteFilePath(lang));
             if (!langDir.exists())
                 continue;
 
@@ -175,7 +201,7 @@ void H1ModTools::populateListIW(QTreeWidget* tree, const QString& path)
             for (const QFileInfo& fileInfo : ffFiles) {
                 QTreeWidgetItem* item = new QTreeWidgetItem(langRoot);
                 item->setText(0, fileInfo.fileName());
-                item->setData(0, Qt::UserRole, fileInfo.absolutePath()); // Just store folder
+                item->setData(0, Qt::UserRole, fileInfo.absoluteFilePath());
             }
         }
     }
@@ -194,7 +220,7 @@ void H1ModTools::populateListIW(QTreeWidget* tree, const QString& path)
         for (const QFileInfo& dirInfo : mapDirs) {
             QTreeWidgetItem* item = new QTreeWidgetItem(mapsRoot);
             item->setText(0, dirInfo.fileName());
-            item->setData(0, Qt::UserRole, dirInfo.absoluteFilePath()); // Use folder directly
+            item->setData(0, Qt::UserRole, dirInfo.filePath());
         }
     }
 
@@ -226,7 +252,7 @@ void H1ModTools::updateVisibility()
 
     ui.buildZoneButton->setEnabled(canCompile);
     ui.compileReflectionsButton->setEnabled(false);
-    ui.RunMapButton->setEnabled(false);
+    ui.runMapButton->setEnabled(false);
     ui.cheatsCheckBox->setEnabled(false);
     ui.developerCheckBox->setEnabled(false);
 
@@ -241,31 +267,169 @@ void H1ModTools::updateVisibility()
         populateListIW(treeWidgetIW5, Globals.pathIW5);
 }
 
+void H1ModTools::on_buildZoneButton_clicked()
+{
+    QString ztPathStr = Globals.pathH1 + "/zonetool.exe";
+    QFileInfo ztFile(ztPathStr);
+
+    if (!ztFile.exists() || !ztFile.isExecutable()) {
+        qWarning() << "zonetool.exe not found or not executable at" << ztPathStr;
+        return;
+    }
+
+    const QString currentSelectedText = treeWidgetH1->currentItem()->text(0);
+    const QString currentSelectedZone = QFileInfo(currentSelectedText).completeBaseName();
+
+    QStringList arguments;
+    arguments << "-buildzone" << currentSelectedZone;
+
+    qDebug() << "Building zone" << currentSelectedZone;
+
+    QProcess* process = new QProcess(this);
+    process->setProgram(ztPathStr);
+    process->setArguments(arguments);
+    process->setWorkingDirectory(ztFile.absolutePath());
+    process->setProcessChannelMode(QProcess::MergedChannels);
+
+    auto readOutput = [](QProcess* process)
+    {
+        auto handleLogLine = [](const QString& line) {
+            // We'll extract and remove the prefix before logging
+            QString trimmedLine = line.trimmed();
+
+            QString message;
+
+            if (trimmedLine.startsWith("[ DEBUG ]", Qt::CaseInsensitive)) {
+                message = trimmedLine.mid(QString("[ DEBUG ]").length()).trimmed();
+                qInfo().noquote() << message;
+            }
+            else if (trimmedLine.startsWith("[ INFO ]", Qt::CaseInsensitive)) {
+                message = trimmedLine.mid(QString("[ INFO ]").length()).trimmed();
+                qInfo().noquote() << message;
+            }
+            else if (trimmedLine.startsWith("[ WARNING ]", Qt::CaseInsensitive)) {
+                message = trimmedLine.mid(QString("[ WARNING ]").length()).trimmed();
+                qWarning().noquote() << message;
+            }
+            else if (trimmedLine.startsWith("[ ERROR ]", Qt::CaseInsensitive)) {
+                message = trimmedLine.mid(QString("[ ERROR ]").length()).trimmed();
+                qCritical().noquote() << message;
+            }
+            else if (trimmedLine.startsWith("[ FATAL ]", Qt::CaseInsensitive)) {
+                message = trimmedLine.mid(QString("[ FATAL ]").length()).trimmed();
+                qCritical().noquote() << message;  // No app exit
+            }
+            else {
+                // No prefix found, just log the entire line
+                qInfo().noquote() << trimmedLine;
+            }
+        };
+
+        QByteArray output = process->readAll();
+        QStringList lines = QString::fromLocal8Bit(output).split('\n', Qt::SkipEmptyParts);
+        for (const QString& line : lines) {
+            if (!line.isEmpty()) {
+                handleLogLine(line);
+            }
+        }
+    };
+
+    connect(process, &QProcess::readyRead, [process, readOutput]() {
+        readOutput(process);
+    });
+
+    connect(process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+        [process, readOutput](int exitCode, QProcess::ExitStatus status) {
+        // Flush any remaining output
+        readOutput(process);
+
+        qDebug() << "zonetool.exe exited with code" << exitCode
+            << (status == QProcess::NormalExit ? "(NormalExit)" : "(CrashExit)");
+        process->deleteLater();
+    });
+
+    process->start();
+    if (!process->waitForStarted()) {
+        qWarning() << "Failed to start zonetool.exe";
+        process->deleteLater();
+    }
+}
+
+void H1ModTools::onOutputBufferContextMenu(const QPoint& pos)
+{
+    QMenu* menu = ui.outputBuffer->createStandardContextMenu();
+    menu->addSeparator();
+
+    QAction* refreshAction = menu->addAction("Refresh");
+    QAction* selectedAction = menu->exec(ui.outputBuffer->mapToGlobal(pos));
+
+    if (selectedAction == refreshAction) {
+        ui.outputBuffer->clear();
+    }
+
+    delete menu;  // clean up
+}
+
 void H1ModTools::onTreeContextMenuRequested(const QPoint& pos)
 {
-    QTreeWidget* tree = qobject_cast<QTreeWidget*>(sender());
+    auto* tree = qobject_cast<QTreeWidget*>(sender());
     if (!tree) return;
 
-    QTreeWidgetItem* item = tree->itemAt(pos);
+    auto* item = tree->itemAt(pos);
     if (!item) return;
 
-    const QVariant pathVar = item->data(0, Qt::UserRole);
-    if (!pathVar.isValid()) return;
-
-    const QString path = pathVar.toString();
+    const QString path = item->data(0, Qt::UserRole).toString();
     if (path.isEmpty()) return;
 
+    const QFileInfo fileInfo(path);
+    const bool isFile = fileInfo.isFile();
+    const bool isCsv = isFile && fileInfo.suffix().compare("csv", Qt::CaseInsensitive) == 0;
+
     QMenu contextMenu(tree);
+    QAction* editAction = nullptr;
     QAction* openExplorerAction = contextMenu.addAction("Open in File Explorer");
+    QAction* deleteAction = nullptr;
+
+    if (isCsv) {
+        contextMenu.addSeparator();
+        editAction = contextMenu.addAction("Edit");
+        contextMenu.addSeparator();
+        deleteAction = contextMenu.addAction("Delete");
+    }
 
     QAction* selectedAction = contextMenu.exec(tree->viewport()->mapToGlobal(pos));
-    if (selectedAction == openExplorerAction) {
-#if defined(Q_OS_WIN)
-        QProcess::startDetached("explorer", { QDir::toNativeSeparators(path) });
-#elif defined(Q_OS_MAC)
-        QProcess::startDetached("open", { path });
-#else // Linux
-        QProcess::startDetached("xdg-open", { path });
-#endif
+    if (!selectedAction) return;
+
+    if (selectedAction == deleteAction) {
+        const QMessageBox::StandardButton reply = QMessageBox::question(
+            tree, "Delete CSV",
+            QString("Are you sure you want to delete '%1'?").arg(fileInfo.fileName()),
+            QMessageBox::Yes | QMessageBox::No
+        );
+        if (reply == QMessageBox::Yes) {
+            if (!QFile::remove(fileInfo.absoluteFilePath())) {
+                QMessageBox::warning(tree, "Delete Failed", "Failed to delete the file.");
+            }
+            else {
+                delete item;
+            }
+        }
+        return;
     }
+
+    if (selectedAction == editAction) {
+        QDesktopServices::openUrl(QUrl::fromLocalFile(fileInfo.absoluteFilePath()));
+        return;
+    }
+
+    // Handle "Open in File Explorer"
+    const QString targetPath = isFile ? fileInfo.absoluteFilePath() : fileInfo.absoluteFilePath();
+
+#if defined(Q_OS_WIN)
+    QProcess::startDetached("explorer", { "/select,", QDir::toNativeSeparators(targetPath) });
+#elif defined(Q_OS_MAC)
+    QProcess::startDetached("open", { targetPath });
+#else // Linux and others
+    QProcess::startDetached("xdg-open", { targetPath });
+#endif
 }
