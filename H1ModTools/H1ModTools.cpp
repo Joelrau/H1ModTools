@@ -320,6 +320,9 @@ void H1ModTools::on_buildZoneButton_clicked()
         return;
     }
 
+    if (treeWidgetH1->currentItem() == nullptr || treeWidgetH1->currentItem()->parent() == nullptr)
+        return;
+
     const QString currentSelectedText = treeWidgetH1->currentItem()->text(0);
     const QString currentSelectedZone = QFileInfo(currentSelectedText).completeBaseName();
 
