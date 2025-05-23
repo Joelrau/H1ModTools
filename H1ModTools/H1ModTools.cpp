@@ -92,6 +92,11 @@ void H1ModTools::loadGlobals() {
     }
 }
 
+bool H1_isMapLoad(const QString& name)
+{
+    return name.endsWith("_load");
+}
+
 bool H1_isMap(const QString& name)
 {
     const QDir baseDir = QDir(Globals.pathH1).filePath("zonetool/" + name);
@@ -267,6 +272,44 @@ void H1ModTools::updateVisibility()
         populateListIW(treeWidgetIW5, Globals.pathIW5);
 }
 
+bool moveToUsermaps(const QString& zone)
+{
+    const auto tryMoveFile = [](const QString& folder, const QString& zoneName, const QString& ext = "") -> bool
+    {
+        QString sourcePath = Globals.pathH1 + "/zone/" + zoneName + ext;
+        QString targetFolder = Globals.pathH1 + "/usermaps/" + folder;
+
+        QFile sourceFile(sourcePath);
+        if (!sourceFile.exists())
+            return false;
+
+        QDir dir;
+        if (!dir.exists(targetFolder))
+        {
+            if (!dir.mkpath(targetFolder))
+                return false;
+        }
+
+        QString targetPath = targetFolder + "/" + zoneName + ext;
+        if (QFile::exists(targetPath))
+            QFile::remove(targetPath); // Overwrite if exists
+
+        return sourceFile.rename(targetPath);
+    };
+
+    if (H1_isMapLoad(zone))
+    {
+        const QString folder = zone.left(zone.length() - 5); // remove "_load"
+        if (tryMoveFile(folder, zone, ".ff"))
+            return true;
+    }
+
+    if (tryMoveFile(zone, zone, ".ff") || tryMoveFile(zone, zone, ".pak"))
+        return true;
+
+    return false;
+}
+
 void H1ModTools::on_buildZoneButton_clicked()
 {
     QString ztPathStr = Globals.pathH1 + "/zonetool.exe";
@@ -279,6 +322,8 @@ void H1ModTools::on_buildZoneButton_clicked()
 
     const QString currentSelectedText = treeWidgetH1->currentItem()->text(0);
     const QString currentSelectedZone = QFileInfo(currentSelectedText).completeBaseName();
+
+    const auto isMap = H1_isMap(currentSelectedZone) || H1_isMapLoad(currentSelectedZone);
 
     QStringList arguments;
     arguments << "-buildzone" << currentSelectedZone;
@@ -339,13 +384,24 @@ void H1ModTools::on_buildZoneButton_clicked()
     });
 
     connect(process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
-        [process, readOutput](int exitCode, QProcess::ExitStatus status) {
+        [process, readOutput, isMap, currentSelectedZone](int exitCode, QProcess::ExitStatus status) {
         // Flush any remaining output
         readOutput(process);
 
         qDebug() << "zonetool.exe exited with code" << exitCode
             << (status == QProcess::NormalExit ? "(NormalExit)" : "(CrashExit)");
         process->deleteLater();
+
+        if (exitCode != QProcess::NormalExit)
+            return;
+
+        // Move map files to usermaps
+        if (isMap && !moveToUsermaps(currentSelectedZone)) {
+            qWarning() << "Failed to move" << currentSelectedZone << "to usermaps";
+        }
+        else if (isMap) {
+            qDebug() << "Moved" << currentSelectedZone << "to usermaps";
+        }
     });
 
     process->start();
