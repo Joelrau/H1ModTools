@@ -312,11 +312,12 @@ bool moveToUsermaps(const QString& zone)
 
 void H1ModTools::on_buildZoneButton_clicked()
 {
-    QString ztPathStr = Globals.pathH1 + "/zonetool.exe";
-    QFileInfo ztFile(ztPathStr);
+    const QString executable = "zonetool.exe";
+    const QString pathStr = Globals.pathH1 + "/" + executable;
+    QFileInfo file(pathStr);
 
-    if (!ztFile.exists() || !ztFile.isExecutable()) {
-        qWarning() << "zonetool.exe not found or not executable at" << ztPathStr;
+    if (!file.exists() || !file.isExecutable()) {
+        qWarning() << executable << "not found or not executable at" << pathStr;
         return;
     }
 
@@ -333,10 +334,12 @@ void H1ModTools::on_buildZoneButton_clicked()
 
     qDebug() << "Building zone" << currentSelectedZone;
 
+    disableUiAndStoreState();
+
     QProcess* process = new QProcess(this);
-    process->setProgram(ztPathStr);
+    process->setProgram(pathStr);
     process->setArguments(arguments);
-    process->setWorkingDirectory(ztFile.absolutePath());
+    process->setWorkingDirectory(file.absolutePath());
     process->setProcessChannelMode(QProcess::MergedChannels);
 
     auto readOutput = [](QProcess* process)
@@ -387,16 +390,20 @@ void H1ModTools::on_buildZoneButton_clicked()
     });
 
     connect(process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
-        [process, readOutput, isMap, currentSelectedZone](int exitCode, QProcess::ExitStatus status) {
+        [this, process, executable, readOutput, isMap, currentSelectedZone](int exitCode, QProcess::ExitStatus status) {
         // Flush any remaining output
         readOutput(process);
 
-        qDebug() << "zonetool.exe exited with code" << exitCode
+        qDebug() << executable << "exited with code" << exitCode
             << (status == QProcess::NormalExit ? "(NormalExit)" : "(CrashExit)");
         process->deleteLater();
 
         if (exitCode != QProcess::NormalExit)
+        {
+            qCritical() << "Failed to build zone" << currentSelectedZone;
+            restoreUiState();
             return;
+        }
 
         // Move map files to usermaps
         if (isMap && !moveToUsermaps(currentSelectedZone)) {
@@ -405,12 +412,176 @@ void H1ModTools::on_buildZoneButton_clicked()
         else if (isMap) {
             qDebug() << "Moved" << currentSelectedZone << "to usermaps";
         }
+
+        qDebug() << "Compiled zone" << currentSelectedZone;
+
+        restoreUiState();
     });
 
     process->start();
     if (!process->waitForStarted()) {
-        qWarning() << "Failed to start zonetool.exe";
+        qWarning() << "Failed to start" << executable;
         process->deleteLater();
+
+        restoreUiState();
+    }
+}
+
+bool moveReflectionProbes(const QString& zone)
+{
+    const QString sourceFolder = Globals.pathH1 + "/dump/" + zone + "/images/";
+    const QString targetFolder = Globals.pathH1 + "/zonetool/" + zone + "/images/";
+
+    QDir sourceDir(sourceFolder);
+    QDir targetDir(targetFolder);
+
+    // Both source and target directories must exist
+    if (!sourceDir.exists() || !targetDir.exists()) {
+        qWarning() << "Required folder does not exist:"
+            << (!sourceDir.exists() ? sourceFolder : targetFolder);
+        return false;
+    }
+
+    // Get _reflection_probe*.dds files and ensure at least one exists
+    const QStringList ddsFiles = sourceDir.entryList(QStringList() << "_reflection_probe*.dds", QDir::Files);
+    if (ddsFiles.isEmpty()) {
+        qWarning() << "No _reflection_probe*.dds files found in" << sourceFolder;
+        return false;
+    }
+
+    // Move the DDS files
+    for (const QString& fileName : ddsFiles) {
+        const QString srcPath = sourceFolder + fileName;
+        const QString dstPath = targetFolder + fileName;
+
+        // If the file exists at destination, remove it
+        if (QFile::exists(dstPath) && !QFile::remove(dstPath)) {
+            qWarning() << "Failed to remove existing destination file:" << dstPath;
+            return false;
+        }
+
+        // Move the file
+        if (!QFile::rename(srcPath, dstPath)) {
+            qWarning() << "Failed to move file:" << srcPath << "->" << dstPath;
+            return false;
+        }
+    }
+
+    // Delete any matching .h1Image files
+    const QStringList h1ImageFiles = sourceDir.entryList(QStringList() << "_reflection_probe*.h1Image", QDir::Files);
+    for (const QString& fileName : h1ImageFiles) {
+        const QString filePath = sourceFolder + fileName;
+
+        if (!QFile::remove(filePath)) {
+            qWarning() << "Failed to delete file:" << filePath;
+            return false;
+        }
+    }
+
+    return true;
+}
+
+void H1ModTools::on_compileReflectionsButton_clicked()
+{
+    const QString executable = "h1-mod_dev.exe";
+    const QString pathStr = Globals.pathH1 + "/" + executable;
+    QFileInfo file(pathStr);
+
+    if (!file.exists() || !file.isExecutable()) {
+        qWarning() << executable << "not found or not executable at" << pathStr;
+        return;
+    }
+
+    if (treeWidgetH1->currentItem() == nullptr || treeWidgetH1->currentItem()->parent() == nullptr)
+        return;
+
+    const QString currentSelectedText = treeWidgetH1->currentItem()->text(0);
+    const QString currentSelectedZone = QFileInfo(currentSelectedText).completeBaseName();
+
+    // Compile reflections
+    QStringList arguments;
+    arguments << "-multiplayer"
+        << "+set" << "r_reflectionProbeGenerate" << "1"
+        << "+set" << "r_reflectionProbeGenerateExit" << "1"
+        << "+map" << currentSelectedZone;
+
+    qDebug() << "Generating reflection probes for zone" << currentSelectedZone;
+
+    disableUiAndStoreState();
+
+    QProcess* process = new QProcess(this);
+    process->setProgram(pathStr);
+    process->setArguments(arguments);
+    process->setWorkingDirectory(file.absolutePath());
+    //process->setProcessChannelMode(QProcess::MergedChannels);
+
+    connect(process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+        [this, process, executable, currentSelectedZone](int exitCode, QProcess::ExitStatus status) {
+        qDebug() << executable << "exited with code" << exitCode
+            << (status == QProcess::NormalExit ? "(NormalExit)" : "(CrashExit)");
+        process->deleteLater();
+
+        if (exitCode != QProcess::NormalExit)
+        {
+            qCritical() << "Failed to generate reflection probes for zone" << currentSelectedZone;
+            restoreUiState();
+            return;
+        }
+
+        if (moveReflectionProbes(currentSelectedZone))
+            qDebug() << "Reflection probes successfully generated";
+
+        restoreUiState();
+
+        qDebug() << "Generated reflection probes for map" << currentSelectedZone;
+        qInfo() << "Build your zone again to see the generated reflection probes";
+    });
+
+    process->start();
+    if (!process->waitForStarted()) {
+        qWarning() << "Failed to start" << executable;
+        process->deleteLater();
+
+        restoreUiState();
+    }
+}
+
+void H1ModTools::on_runMapButton_clicked()
+{
+    const QString executable = "h1-mod_dev.exe";
+    const QString pathStr = Globals.pathH1 + "/" + executable;
+    QFileInfo file(pathStr);
+
+    if (!file.exists() || !file.isExecutable()) {
+        qWarning() << executable << "not found or not executable at" << pathStr;
+        return;
+    }
+
+    if (treeWidgetH1->currentItem() == nullptr || treeWidgetH1->currentItem()->parent() == nullptr)
+        return;
+
+    const QString currentSelectedText = treeWidgetH1->currentItem()->text(0);
+    const QString currentSelectedZone = QFileInfo(currentSelectedText).completeBaseName();
+
+    const bool isMP = currentSelectedZone.startsWith("mp_");
+
+    // Run map
+    QStringList arguments;
+    arguments << (isMP ? "-multiplayer" : "-singleplayer");
+    if (ui.cheatsCheckBox->isChecked())
+        arguments << "+set" << "sv_cheats" << "1";
+    if (ui.developerCheckBox->isChecked()) {
+        arguments << "+set" << "developer" << "1";
+        arguments << "+set" << "developer_script" << "1";
+    }
+    arguments << (ui.cheatsCheckBox->isChecked() ? "+devmap" : "+map") << currentSelectedZone;
+
+    qDebug() << "Launching map" << currentSelectedZone;
+
+    // Launch detached
+    QString workingDir = file.absolutePath();
+    if (!QProcess::startDetached(pathStr, arguments, workingDir)) {
+        qWarning() << "Failed to launch detached process:" << pathStr;
     }
 }
 
@@ -491,4 +662,35 @@ void H1ModTools::onTreeContextMenuRequested(const QPoint& pos)
 #else // Linux and others
     QProcess::startDetached("xdg-open", { targetPath });
 #endif
+}
+
+void H1ModTools::disableUiAndStoreState()
+{
+    QList<QWidget*> widgets = {
+        ui.buildZoneButton,
+        ui.exportButton,
+        ui.compileReflectionsButton,
+        ui.runMapButton,
+        ui.settingsButton,
+        ui.tabWidget,
+        ui.cheatsCheckBox,
+        ui.developerCheckBox,
+        ui.generateCsvCheckBox
+    };
+
+    m_uiEnabledStates.clear();
+    for (QWidget* widget : widgets)
+    {
+        m_uiEnabledStates[widget] = widget->isEnabled();
+        widget->setEnabled(false);
+    }
+}
+
+void H1ModTools::restoreUiState()
+{
+    for (auto it = m_uiEnabledStates.begin(); it != m_uiEnabledStates.end(); ++it)
+    {
+        it.key()->setEnabled(it.value());
+    }
+    m_uiEnabledStates.clear();
 }

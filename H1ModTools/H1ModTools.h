@@ -26,6 +26,8 @@ private:
     void loadGlobals();
 
 private slots:
+    void on_runMapButton_clicked();
+    void on_compileReflectionsButton_clicked();
     void on_buildZoneButton_clicked();
     void on_settingsButton_clicked();
     void onTreeContextMenuRequested(const QPoint& pos);
@@ -39,4 +41,8 @@ private:
     QTreeWidget* treeWidgetIW3 = nullptr;
     QTreeWidget* treeWidgetIW4 = nullptr;
     QTreeWidget* treeWidgetIW5 = nullptr;
+
+    QMap<QWidget*, bool> m_uiEnabledStates;
+    void disableUiAndStoreState();
+    void restoreUiState();
 };
