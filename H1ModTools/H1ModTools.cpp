@@ -590,7 +590,7 @@ void H1ModTools::onOutputBufferContextMenu(const QPoint& pos)
     QMenu* menu = ui.outputBuffer->createStandardContextMenu();
     menu->addSeparator();
 
-    QAction* refreshAction = menu->addAction("Refresh");
+    QAction* refreshAction = menu->addAction("Clear");
     QAction* selectedAction = menu->exec(ui.outputBuffer->mapToGlobal(pos));
 
     if (selectedAction == refreshAction) {
