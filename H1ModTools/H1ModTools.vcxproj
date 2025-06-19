@@ -94,6 +94,7 @@
   <ItemGroup>
     <ClCompile Include="Globals.cpp" />
     <ClCompile Include="LogRedirector.cpp" />
+    <ClCompile Include="QTUtils.cpp" />
     <ClCompile Include="SettingsDialog.cpp" />
     <QtRcc Include="H1ModTools.qrc" />
     <QtUic Include="H1ModTools.ui" />
@@ -116,6 +117,7 @@
     <QtMoc Include="SettingsDialog.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="QTUtils.h" />
     <QtMoc Include="LogRedirector.h" />
     <ClInclude Include="Globals.h" />
   </ItemGroup>

@@ -18,6 +18,9 @@
 #include <QTreeWidget>
 #include <QMenu>
 #include <QDesktopServices>
+#include <QProgressDialog>
+
+#include "QTUtils.h"
 
 struct Globals_e
 {

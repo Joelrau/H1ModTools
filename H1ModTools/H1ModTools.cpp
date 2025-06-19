@@ -17,6 +17,166 @@ void setupStyle()
     }
 }
 
+namespace Funcs
+{
+    namespace H1
+    {
+        bool isMapLoad(const QString& name)
+        {
+            return name.endsWith("_load");
+        }
+
+        bool isMap(const QString& name)
+        {
+            const QDir baseDir = QDir(Globals.pathH1).filePath("zonetool/" + name);
+            if (!baseDir.exists())
+                return false;
+
+            const QString spPath = baseDir.filePath(QStringLiteral("maps/%1.d3dbsp.ents").arg(name));
+            const QString mpPath = baseDir.filePath(QStringLiteral("maps/mp/%1.d3dbsp.ents").arg(name));
+
+            return QFileInfo::exists(spPath) || QFileInfo::exists(mpPath);
+        }
+
+        bool moveToUsermaps(const QString& zone)
+        {
+            const auto tryMoveFile = [](const QString& folder, const QString& zoneName, const QString& ext = "") -> bool
+            {
+                QString sourcePath = Globals.pathH1 + "/zone/" + zoneName + ext;
+                QString targetFolder = Globals.pathH1 + "/usermaps/" + folder;
+
+                QFile sourceFile(sourcePath);
+                if (!sourceFile.exists())
+                    return false;
+
+                QDir dir;
+                if (!dir.exists(targetFolder))
+                {
+                    if (!dir.mkpath(targetFolder))
+                        return false;
+                }
+
+                QString targetPath = targetFolder + "/" + zoneName + ext;
+                if (QFile::exists(targetPath))
+                    QFile::remove(targetPath); // Overwrite if exists
+
+                return sourceFile.rename(targetPath);
+            };
+
+            if (Funcs::H1::isMapLoad(zone))
+            {
+                const QString folder = zone.left(zone.length() - 5); // remove "_load"
+                if (tryMoveFile(folder, zone, ".ff"))
+                    return true;
+            }
+
+            if (tryMoveFile(zone, zone, ".ff") || tryMoveFile(zone, zone, ".pak"))
+                return true;
+
+            return false;
+        }
+
+        bool moveReflectionProbes(const QString& zone)
+        {
+            const QString sourceFolder = Globals.pathH1 + "/dump/" + zone + "/images/";
+            const QString targetFolder = Globals.pathH1 + "/zonetool/" + zone + "/images/";
+
+            QDir sourceDir(sourceFolder);
+            QDir targetDir(targetFolder);
+
+            // Both source and target directories must exist
+            if (!sourceDir.exists() || !targetDir.exists()) {
+                qWarning() << "Required folder does not exist:"
+                    << (!sourceDir.exists() ? sourceFolder : targetFolder);
+                return false;
+            }
+
+            // Get _reflection_probe*.dds files and ensure at least one exists
+            const QStringList ddsFiles = sourceDir.entryList(QStringList() << "_reflection_probe*.dds", QDir::Files);
+            if (ddsFiles.isEmpty()) {
+                qWarning() << "No _reflection_probe*.dds files found in" << sourceFolder;
+                return false;
+            }
+
+            // Move the DDS files
+            for (const QString& fileName : ddsFiles) {
+                const QString srcPath = sourceFolder + fileName;
+                const QString dstPath = targetFolder + fileName;
+
+                // If the file exists at destination, remove it
+                if (QFile::exists(dstPath) && !QFile::remove(dstPath)) {
+                    qWarning() << "Failed to remove existing destination file:" << dstPath;
+                    return false;
+                }
+
+                // Move the file
+                if (!QFile::rename(srcPath, dstPath)) {
+                    qWarning() << "Failed to move file:" << srcPath << "->" << dstPath;
+                    return false;
+                }
+            }
+
+            // Delete any matching .h1Image files
+            const QStringList h1ImageFiles = sourceDir.entryList(QStringList() << "_reflection_probe*.h1Image", QDir::Files);
+            for (const QString& fileName : h1ImageFiles) {
+                const QString filePath = sourceFolder + fileName;
+
+                if (!QFile::remove(filePath)) {
+                    qWarning() << "Failed to delete file:" << filePath;
+                    return false;
+                }
+            }
+
+            return true;
+        }
+    }
+    namespace Shared
+    {
+        void readOutputFromProcess(QProcess* process)
+        {
+            auto handleLogLine = [](const QString& line) {
+                // We'll extract and remove the prefix before logging
+                QString trimmedLine = line.trimmed();
+
+                QString message;
+
+                if (trimmedLine.startsWith("[ DEBUG ]", Qt::CaseInsensitive)) {
+                    message = trimmedLine.mid(QString("[ DEBUG ]").length()).trimmed();
+                    qInfo().noquote() << message;
+                }
+                else if (trimmedLine.startsWith("[ INFO ]", Qt::CaseInsensitive)) {
+                    message = trimmedLine.mid(QString("[ INFO ]").length()).trimmed();
+                    qInfo().noquote() << message;
+                }
+                else if (trimmedLine.startsWith("[ WARNING ]", Qt::CaseInsensitive)) {
+                    message = trimmedLine.mid(QString("[ WARNING ]").length()).trimmed();
+                    qWarning().noquote() << message;
+                }
+                else if (trimmedLine.startsWith("[ ERROR ]", Qt::CaseInsensitive)) {
+                    message = trimmedLine.mid(QString("[ ERROR ]").length()).trimmed();
+                    qCritical().noquote() << message;
+                }
+                else if (trimmedLine.startsWith("[ FATAL ]", Qt::CaseInsensitive)) {
+                    message = trimmedLine.mid(QString("[ FATAL ]").length()).trimmed();
+                    qCritical().noquote() << message;  // No app exit
+                }
+                else {
+                    // No prefix found, just log the entire line
+                    qInfo().noquote() << trimmedLine;
+                }
+            };
+
+            QByteArray output = process->readAll();
+            QStringList lines = QString::fromLocal8Bit(output).split('\n', Qt::SkipEmptyParts);
+            for (const QString& line : lines) {
+                if (!line.isEmpty()) {
+                    handleLogLine(line);
+                }
+            }
+        }
+    }
+}
+
 H1ModTools::H1ModTools(QWidget *parent)
     : QMainWindow(parent)
 {
@@ -92,25 +252,7 @@ void H1ModTools::loadGlobals() {
     }
 }
 
-bool H1_isMapLoad(const QString& name)
-{
-    return name.endsWith("_load");
-}
-
-bool H1_isMap(const QString& name)
-{
-    const QDir baseDir = QDir(Globals.pathH1).filePath("zonetool/" + name);
-    if (!baseDir.exists())
-        return false;
-
-    const QString spPath = baseDir.filePath(QStringLiteral("maps/%1.d3dbsp.ents").arg(name));
-    const QString mpPath = baseDir.filePath(QStringLiteral("maps/mp/%1.d3dbsp.ents").arg(name));
-
-    return QFileInfo::exists(spPath) || QFileInfo::exists(mpPath);
-}
-
-void H1ModTools::setupListWidgets()
-{
+void H1ModTools::setupListWidgets() {
     // Create and layout each QTreeWidget inside the corresponding tab
     auto setupTabTree = [](QWidget* tab, QTreeWidget*& treeWidget) {
         treeWidget = new QTreeWidget(tab);
@@ -142,7 +284,7 @@ void H1ModTools::setupListWidgets()
             const auto name = QFileInfo(current->text(0)).completeBaseName();
             qDebug() << "Current item:" << name;
 
-            const bool isMap = H1_isMap(name);
+            const bool isMap = Funcs::H1::isMap(name);
             ui.compileReflectionsButton->setEnabled(isMap);
             ui.runMapButton->setEnabled(isMap);
             ui.cheatsCheckBox->setEnabled(isMap);
@@ -151,8 +293,7 @@ void H1ModTools::setupListWidgets()
     });
 }
 
-void H1ModTools::populateListH1(QTreeWidget* tree, const QString& path)
-{
+void H1ModTools::populateListH1(QTreeWidget* tree, const QString& path) {
     tree->clear();
 
     QDir zoneSourceDir(path + "/zone_source");
@@ -178,8 +319,7 @@ void H1ModTools::populateListH1(QTreeWidget* tree, const QString& path)
     tree->expandAll();
 }
 
-void H1ModTools::populateListIW(QTreeWidget* tree, const QString& path)
-{
+void H1ModTools::populateListIW(QTreeWidget* tree, const QString& path) {
     tree->clear();
 
     const QStringList languageFolders = {
@@ -232,28 +372,26 @@ void H1ModTools::populateListIW(QTreeWidget* tree, const QString& path)
     tree->expandAll();
 }
 
-void H1ModTools::populateLists()
-{
+void H1ModTools::populateLists() {
     populateListH1(treeWidgetH1, Globals.pathH1);
     populateListIW(treeWidgetIW3, Globals.pathIW3);
     populateListIW(treeWidgetIW4, Globals.pathIW4);
     populateListIW(treeWidgetIW5, Globals.pathIW5);
 }
 
-void H1ModTools::updateVisibility()
-{
-    int index = ui.tabWidget->currentIndex();
-    QWidget* currentTab = ui.tabWidget->widget(index);
+void H1ModTools::updateVisibility() {
+	const auto gameType = getCurrentGameType();
 
     // Check if the current tab is H1
-    bool isH1Selected = ui.tabWidget->currentWidget() == ui.tabH1;
+    bool isH1Selected = gameType == GameType::H1;
 
-    // Example logic: enable export only if H1 tab is active
+    // Enable export only if H1 tab is inactive and compile if it is active
     const bool canExport = !isH1Selected;
     const bool canCompile = isH1Selected;
 
     ui.exportButton->setEnabled(canExport);
     ui.generateCsvCheckBox->setEnabled(canExport);
+    ui.convertGscCheckBox->setEnabled(canExport);
 
     ui.buildZoneButton->setEnabled(canCompile);
     ui.compileReflectionsButton->setEnabled(false);
@@ -262,56 +400,153 @@ void H1ModTools::updateVisibility()
     ui.developerCheckBox->setEnabled(false);
 
     // Refresh list based on selected tab
-    if (currentTab == ui.tabH1)
+    if (gameType == GameType::H1)
         populateListH1(treeWidgetH1, Globals.pathH1);
-    else if (currentTab == ui.tabIW3)
+    else if (gameType == GameType::IW3)
         populateListIW(treeWidgetIW3, Globals.pathIW3);
-    else if (currentTab == ui.tabIW4)
+    else if (gameType == GameType::IW4)
         populateListIW(treeWidgetIW4, Globals.pathIW4);
-    else if (currentTab == ui.tabIW5)
+    else if (gameType == GameType::IW5)
         populateListIW(treeWidgetIW5, Globals.pathIW5);
 }
 
-bool moveToUsermaps(const QString& zone)
-{
-    const auto tryMoveFile = [](const QString& folder, const QString& zoneName, const QString& ext = "") -> bool
-    {
-        QString sourcePath = Globals.pathH1 + "/zone/" + zoneName + ext;
-        QString targetFolder = Globals.pathH1 + "/usermaps/" + folder;
-
-        QFile sourceFile(sourcePath);
-        if (!sourceFile.exists())
-            return false;
-
-        QDir dir;
-        if (!dir.exists(targetFolder))
-        {
-            if (!dir.mkpath(targetFolder))
-                return false;
-        }
-
-        QString targetPath = targetFolder + "/" + zoneName + ext;
-        if (QFile::exists(targetPath))
-            QFile::remove(targetPath); // Overwrite if exists
-
-        return sourceFile.rename(targetPath);
-    };
-
-    if (H1_isMapLoad(zone))
-    {
-        const QString folder = zone.left(zone.length() - 5); // remove "_load"
-        if (tryMoveFile(folder, zone, ".ff"))
-            return true;
-    }
-
-    if (tryMoveFile(zone, zone, ".ff") || tryMoveFile(zone, zone, ".pak"))
-        return true;
-
-    return false;
+GameType H1ModTools::getCurrentGameType() {
+    if (ui.tabWidget->currentWidget() == ui.tabH1) return GameType::H1;
+    if (ui.tabWidget->currentWidget() == ui.tabIW3) return GameType::IW3;
+    if (ui.tabWidget->currentWidget() == ui.tabIW4) return GameType::IW4;
+    if (ui.tabWidget->currentWidget() == ui.tabIW5) return GameType::IW5;
+    return GameType::H1; // Default to H1
 }
 
-void H1ModTools::on_buildZoneButton_clicked()
-{
+void H1ModTools::on_exportButton_clicked() {
+    const auto gameType = getCurrentGameType();
+
+    const auto getExecutableName = [gameType]() -> QString {
+        switch (gameType) {
+        case GameType::IW3: return "zonetool_iw3.exe";
+        case GameType::IW4: return "zonetool_iw4.exe";
+        case GameType::IW5: return "zonetool_iw5.exe";
+        }
+        __debugbreak();
+        return "";
+    };
+
+    const auto getGamePath = [gameType]() -> QString {
+        switch (gameType) {
+        case GameType::IW3: return Globals.pathIW3;
+        case GameType::IW4: return Globals.pathIW4;
+        case GameType::IW5: return Globals.pathIW5;
+        }
+        __debugbreak();
+        return "";
+    };
+
+    const QString executable = getExecutableName();
+    const QString pathStr = getGamePath() + "/" + executable;
+    QFileInfo file(pathStr);
+
+    if (!file.exists() || !file.isExecutable()) {
+        qWarning() << executable << "not found or not executable at" << pathStr;
+        return;
+    }
+
+    const auto getCurrentTreeWidget = [this, gameType]() {
+        switch (gameType) {
+        case GameType::IW3: return treeWidgetIW3;
+        case GameType::IW4: return treeWidgetIW4;
+        case GameType::IW5: return treeWidgetIW5;
+        }
+        return static_cast<QTreeWidget*>(nullptr);
+    };
+
+    auto* widget = getCurrentTreeWidget();
+    if (!widget || !widget->currentItem() || !widget->currentItem()->parent())
+        return;
+
+    const QString currentSelectedText = widget->currentItem()->text(0);
+    const QString currentSelectedPath = widget->currentItem()->data(0, Qt::UserRole).toString();
+    const bool isUserMap = currentSelectedPath.contains("usermaps");
+
+    if (isUserMap)
+        qInfo() << "Exporting map" << currentSelectedText;
+    else
+        qInfo() << "Exporting zone" << currentSelectedText;
+
+    disableUiAndStoreState();
+
+    const auto dumpZone = [=](const QString& zone) {
+        QStringList arguments;
+        arguments << "-silent" << "-dumpzone" << zone;
+
+        QProcess* process = new QProcess(this);
+        process->setProgram(pathStr);
+        process->setArguments(arguments);
+        process->setWorkingDirectory(file.absolutePath());
+        process->setProcessChannelMode(QProcess::MergedChannels);
+
+        connect(process, &QProcess::readyRead, [process]() {
+            Funcs::Shared::readOutputFromProcess(process);
+        });
+
+        connect(process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, [=](int exitCode, QProcess::ExitStatus status) {
+            Funcs::Shared::readOutputFromProcess(process);
+            process->deleteLater();
+
+            if (status != QProcess::NormalExit || exitCode != 0) {
+                qCritical() << executable << "exited with error during zone export.";
+                restoreUiState();
+                return;
+            }
+
+            const QString sourceFile = Globals.pathH1 + "/zone_source/" + zone + ".csv";
+
+            const QString dumpFolder = getGamePath() + "/dump/" + zone;
+            const QString destFolder = Globals.pathH1 + "/zonetool/" + zone;
+            QtUtils::moveDirectory(dumpFolder, destFolder);
+
+            if (ui.convertGscCheckBox->isChecked()) {
+                // fixup GSC...
+            }
+
+            if (ui.generateCsvCheckBox->isChecked()) {
+                // generate CSV...
+            }
+
+            restoreUiState();
+
+            if (QFile(sourceFile).exists())
+            {
+                //populateListH1(treeWidgetH1, Globals.pathH1);
+				//ui.tabWidget->setCurrentWidget(ui.tabH1);
+                //auto items = treeWidgetH1->findItems(zone + ".csv", Qt::MatchExactly); // this doesn't work
+                //if (!items.isEmpty()) {
+                //    treeWidgetH1->setCurrentItem(items.first());
+                //    treeWidgetH1->scrollToItem(treeWidgetH1->currentItem(), QAbstractItemView::PositionAtCenter);
+                //    treeWidgetH1->setFocus();
+                //}
+            }
+        });
+
+        process->start();
+        if (!process->waitForStarted()) {
+            qWarning() << "Failed to start process:" << executable;
+            process->deleteLater();
+            restoreUiState();
+        }
+    };
+
+    if (!isUserMap) {
+        const QString zone = QFileInfo(currentSelectedText).completeBaseName();
+        dumpZone(zone);
+    }
+    else {
+        // TODO: Handle usermap export logic
+        restoreUiState();
+    }
+}
+
+void H1ModTools::on_buildZoneButton_clicked() {
     const QString executable = "zonetool.exe";
     const QString pathStr = Globals.pathH1 + "/" + executable;
     QFileInfo file(pathStr);
@@ -327,7 +562,7 @@ void H1ModTools::on_buildZoneButton_clicked()
     const QString currentSelectedText = treeWidgetH1->currentItem()->text(0);
     const QString currentSelectedZone = QFileInfo(currentSelectedText).completeBaseName();
 
-    const auto isMap = H1_isMap(currentSelectedZone) || H1_isMapLoad(currentSelectedZone);
+    const auto isMap = Funcs::H1::isMap(currentSelectedZone) || Funcs::H1::isMapLoad(currentSelectedZone);
 
     QStringList arguments;
     arguments << "-buildzone" << currentSelectedZone;
@@ -342,57 +577,14 @@ void H1ModTools::on_buildZoneButton_clicked()
     process->setWorkingDirectory(file.absolutePath());
     process->setProcessChannelMode(QProcess::MergedChannels);
 
-    auto readOutput = [](QProcess* process)
-    {
-        auto handleLogLine = [](const QString& line) {
-            // We'll extract and remove the prefix before logging
-            QString trimmedLine = line.trimmed();
-
-            QString message;
-
-            if (trimmedLine.startsWith("[ DEBUG ]", Qt::CaseInsensitive)) {
-                message = trimmedLine.mid(QString("[ DEBUG ]").length()).trimmed();
-                qInfo().noquote() << message;
-            }
-            else if (trimmedLine.startsWith("[ INFO ]", Qt::CaseInsensitive)) {
-                message = trimmedLine.mid(QString("[ INFO ]").length()).trimmed();
-                qInfo().noquote() << message;
-            }
-            else if (trimmedLine.startsWith("[ WARNING ]", Qt::CaseInsensitive)) {
-                message = trimmedLine.mid(QString("[ WARNING ]").length()).trimmed();
-                qWarning().noquote() << message;
-            }
-            else if (trimmedLine.startsWith("[ ERROR ]", Qt::CaseInsensitive)) {
-                message = trimmedLine.mid(QString("[ ERROR ]").length()).trimmed();
-                qCritical().noquote() << message;
-            }
-            else if (trimmedLine.startsWith("[ FATAL ]", Qt::CaseInsensitive)) {
-                message = trimmedLine.mid(QString("[ FATAL ]").length()).trimmed();
-                qCritical().noquote() << message;  // No app exit
-            }
-            else {
-                // No prefix found, just log the entire line
-                qInfo().noquote() << trimmedLine;
-            }
-        };
-
-        QByteArray output = process->readAll();
-        QStringList lines = QString::fromLocal8Bit(output).split('\n', Qt::SkipEmptyParts);
-        for (const QString& line : lines) {
-            if (!line.isEmpty()) {
-                handleLogLine(line);
-            }
-        }
-    };
-
-    connect(process, &QProcess::readyRead, [process, readOutput]() {
-        readOutput(process);
+    connect(process, &QProcess::readyRead, [process]() {
+        Funcs::Shared::readOutputFromProcess(process);
     });
 
     connect(process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
-        [this, process, executable, readOutput, isMap, currentSelectedZone](int exitCode, QProcess::ExitStatus status) {
+        [this, process, executable, isMap, currentSelectedZone](int exitCode, QProcess::ExitStatus status) {
         // Flush any remaining output
-        readOutput(process);
+        Funcs::Shared::readOutputFromProcess(process);
 
         qDebug() << executable << "exited with code" << exitCode
             << (status == QProcess::NormalExit ? "(NormalExit)" : "(CrashExit)");
@@ -406,7 +598,7 @@ void H1ModTools::on_buildZoneButton_clicked()
         }
 
         // Move map files to usermaps
-        if (isMap && !moveToUsermaps(currentSelectedZone)) {
+        if (isMap && !Funcs::H1::moveToUsermaps(currentSelectedZone)) {
             qWarning() << "Failed to move" << currentSelectedZone << "to usermaps";
         }
         else if (isMap) {
@@ -424,65 +616,11 @@ void H1ModTools::on_buildZoneButton_clicked()
         process->deleteLater();
 
         restoreUiState();
+        return;
     }
 }
 
-bool moveReflectionProbes(const QString& zone)
-{
-    const QString sourceFolder = Globals.pathH1 + "/dump/" + zone + "/images/";
-    const QString targetFolder = Globals.pathH1 + "/zonetool/" + zone + "/images/";
-
-    QDir sourceDir(sourceFolder);
-    QDir targetDir(targetFolder);
-
-    // Both source and target directories must exist
-    if (!sourceDir.exists() || !targetDir.exists()) {
-        qWarning() << "Required folder does not exist:"
-            << (!sourceDir.exists() ? sourceFolder : targetFolder);
-        return false;
-    }
-
-    // Get _reflection_probe*.dds files and ensure at least one exists
-    const QStringList ddsFiles = sourceDir.entryList(QStringList() << "_reflection_probe*.dds", QDir::Files);
-    if (ddsFiles.isEmpty()) {
-        qWarning() << "No _reflection_probe*.dds files found in" << sourceFolder;
-        return false;
-    }
-
-    // Move the DDS files
-    for (const QString& fileName : ddsFiles) {
-        const QString srcPath = sourceFolder + fileName;
-        const QString dstPath = targetFolder + fileName;
-
-        // If the file exists at destination, remove it
-        if (QFile::exists(dstPath) && !QFile::remove(dstPath)) {
-            qWarning() << "Failed to remove existing destination file:" << dstPath;
-            return false;
-        }
-
-        // Move the file
-        if (!QFile::rename(srcPath, dstPath)) {
-            qWarning() << "Failed to move file:" << srcPath << "->" << dstPath;
-            return false;
-        }
-    }
-
-    // Delete any matching .h1Image files
-    const QStringList h1ImageFiles = sourceDir.entryList(QStringList() << "_reflection_probe*.h1Image", QDir::Files);
-    for (const QString& fileName : h1ImageFiles) {
-        const QString filePath = sourceFolder + fileName;
-
-        if (!QFile::remove(filePath)) {
-            qWarning() << "Failed to delete file:" << filePath;
-            return false;
-        }
-    }
-
-    return true;
-}
-
-void H1ModTools::on_compileReflectionsButton_clicked()
-{
+void H1ModTools::on_compileReflectionsButton_clicked() {
     const QString executable = "h1-mod_dev.exe";
     const QString pathStr = Globals.pathH1 + "/" + executable;
     QFileInfo file(pathStr);
@@ -528,7 +666,7 @@ void H1ModTools::on_compileReflectionsButton_clicked()
             return;
         }
 
-        if (moveReflectionProbes(currentSelectedZone))
+        if (Funcs::H1::moveReflectionProbes(currentSelectedZone))
             qDebug() << "Reflection probes successfully generated";
 
         restoreUiState();
@@ -546,8 +684,7 @@ void H1ModTools::on_compileReflectionsButton_clicked()
     }
 }
 
-void H1ModTools::on_runMapButton_clicked()
-{
+void H1ModTools::on_runMapButton_clicked() {
     const QString executable = "h1-mod_dev.exe";
     const QString pathStr = Globals.pathH1 + "/" + executable;
     QFileInfo file(pathStr);
@@ -585,8 +722,7 @@ void H1ModTools::on_runMapButton_clicked()
     }
 }
 
-void H1ModTools::onOutputBufferContextMenu(const QPoint& pos)
-{
+void H1ModTools::onOutputBufferContextMenu(const QPoint& pos) {
     QMenu* menu = ui.outputBuffer->createStandardContextMenu();
     menu->addSeparator();
 
@@ -600,8 +736,7 @@ void H1ModTools::onOutputBufferContextMenu(const QPoint& pos)
     delete menu;  // clean up
 }
 
-void H1ModTools::onTreeContextMenuRequested(const QPoint& pos)
-{
+void H1ModTools::onTreeContextMenuRequested(const QPoint& pos) {
     auto* tree = qobject_cast<QTreeWidget*>(sender());
     if (!tree) return;
 
@@ -664,8 +799,7 @@ void H1ModTools::onTreeContextMenuRequested(const QPoint& pos)
 #endif
 }
 
-void H1ModTools::disableUiAndStoreState()
-{
+void H1ModTools::disableUiAndStoreState() {
     QList<QWidget*> widgets = {
         ui.buildZoneButton,
         ui.exportButton,
@@ -675,7 +809,8 @@ void H1ModTools::disableUiAndStoreState()
         ui.tabWidget,
         ui.cheatsCheckBox,
         ui.developerCheckBox,
-        ui.generateCsvCheckBox
+        ui.generateCsvCheckBox,
+        ui.convertGscCheckBox,
     };
 
     m_uiEnabledStates.clear();
@@ -686,8 +821,7 @@ void H1ModTools::disableUiAndStoreState()
     }
 }
 
-void H1ModTools::restoreUiState()
-{
+void H1ModTools::restoreUiState() {
     for (auto it = m_uiEnabledStates.begin(); it != m_uiEnabledStates.end(); ++it)
     {
         it.key()->setEnabled(it.value());

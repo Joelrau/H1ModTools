@@ -102,7 +102,7 @@
      </layout>
     </item>
     <item row="12" column="3">
-     <widget class="QWidget" name="" native="true">
+     <widget class="QWidget" name="widget" native="true">
       <layout class="QVBoxLayout" name="verticalLayout">
        <property name="sizeConstraint">
         <enum>QLayout::SizeConstraint::SetDefaultConstraint</enum>
@@ -136,6 +136,16 @@
           <widget class="QCheckBox" name="generateCsvCheckBox">
            <property name="text">
             <string>Generate CSV</string>
+           </property>
+           <property name="checked">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="convertGscCheckBox">
+           <property name="text">
+            <string>Convert GSC</string>
            </property>
            <property name="checked">
             <bool>true</bool>
