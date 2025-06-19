@@ -406,10 +406,10 @@ void H1ModTools::updateVisibility() {
         populateListIW(treeWidgetIW3, Globals.pathIW3);
         break;
     case IW4:
-        populateListIW(treeWidgetIW3, Globals.pathIW4);
+        populateListIW(treeWidgetIW4, Globals.pathIW4);
         break;
     case IW5:
-        populateListIW(treeWidgetIW3, Globals.pathIW5);
+        populateListIW(treeWidgetIW5, Globals.pathIW5);
         break;
     default:
         break;
