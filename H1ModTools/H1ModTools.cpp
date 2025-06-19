@@ -417,34 +417,36 @@ void H1ModTools::updateVisibility() {
 }
 
 GameType H1ModTools::getCurrentGameType() {
-    if (ui.tabWidget->currentWidget() == ui.tabH1) return GameType::H1;
-    if (ui.tabWidget->currentWidget() == ui.tabIW3) return GameType::IW3;
-    if (ui.tabWidget->currentWidget() == ui.tabIW4) return GameType::IW4;
-    if (ui.tabWidget->currentWidget() == ui.tabIW5) return GameType::IW5;
-    return GameType::H1; // Default to H1
+    if (ui.tabWidget->currentWidget() == ui.tabIW3) return IW3;
+    if (ui.tabWidget->currentWidget() == ui.tabIW4) return IW4;
+    if (ui.tabWidget->currentWidget() == ui.tabIW5) return IW5;
+    return H1;
 }
 
 void H1ModTools::on_exportButton_clicked() {
     const auto gameType = getCurrentGameType();
 
-    const auto getExecutableName = [gameType]() -> QString {
-        switch (gameType) {
+    static const auto getExecutableName = [gameType]() -> QString {
+        switch (gameType)
+        {
         case GameType::IW3: return "zonetool_iw3.exe";
         case GameType::IW4: return "zonetool_iw4.exe";
         case GameType::IW5: return "zonetool_iw5.exe";
+        default:
+            __debugbreak();
+            return "";
         }
-        __debugbreak();
-        return "";
     };
 
-    const auto getGamePath = [gameType]() -> QString {
+    static const auto getGamePath = [gameType]() -> QString {
         switch (gameType) {
         case GameType::IW3: return Globals.pathIW3;
         case GameType::IW4: return Globals.pathIW4;
         case GameType::IW5: return Globals.pathIW5;
+        default:
+            __debugbreak();
+            return "";
         }
-        __debugbreak();
-        return "";
     };
 
     const QString executable = getExecutableName();
@@ -461,8 +463,9 @@ void H1ModTools::on_exportButton_clicked() {
         case GameType::IW3: return treeWidgetIW3;
         case GameType::IW4: return treeWidgetIW4;
         case GameType::IW5: return treeWidgetIW5;
+        default:
+            return static_cast<QTreeWidget*>(nullptr);
         }
-        return static_cast<QTreeWidget*>(nullptr);
     };
 
     auto* widget = getCurrentTreeWidget();
@@ -534,7 +537,7 @@ void H1ModTools::on_exportButton_clicked() {
 
             restoreUiState();
 
-            if(showH1Widget)
+            if (showH1Widget)
                 showH1WidgetForZone(zone);
 
             return;
