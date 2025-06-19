@@ -63,7 +63,7 @@ namespace Funcs
                 return sourceFile.rename(targetPath);
             };
 
-            if (Funcs::H1::isMapLoad(zone))
+            if (isMapLoad(zone))
             {
                 const QString folder = zone.left(zone.length() - 5); // remove "_load"
                 if (tryMoveFile(folder, zone, ".ff"))
@@ -380,34 +380,40 @@ void H1ModTools::populateLists() {
 }
 
 void H1ModTools::updateVisibility() {
-	const auto gameType = getCurrentGameType();
+    const auto gameType = getCurrentGameType();
+    const auto isH1Selected = gameType == GameType::H1;
 
-    // Check if the current tab is H1
-    bool isH1Selected = gameType == GameType::H1;
+    const auto canExport = !isH1Selected;
+    const auto canCompile = isH1Selected;
 
-    // Enable export only if H1 tab is inactive and compile if it is active
-    const bool canExport = !isH1Selected;
-    const bool canCompile = isH1Selected;
+    ui.exportButton->setVisible(canExport);
+    ui.generateCsvCheckBox->setVisible(canExport);
+    ui.convertGscCheckBox->setVisible(canExport);
 
-    ui.exportButton->setEnabled(canExport);
-    ui.generateCsvCheckBox->setEnabled(canExport);
-    ui.convertGscCheckBox->setEnabled(canExport);
+    ui.buildZoneButton->setVisible(canCompile);
+    ui.compileReflectionsButton->setVisible(canCompile);
+    ui.runMapButton->setVisible(canCompile);
+    ui.cheatsCheckBox->setVisible(canCompile);
+    ui.developerCheckBox->setVisible(canCompile);
 
-    ui.buildZoneButton->setEnabled(canCompile);
-    ui.compileReflectionsButton->setEnabled(false);
-    ui.runMapButton->setEnabled(false);
-    ui.cheatsCheckBox->setEnabled(false);
-    ui.developerCheckBox->setEnabled(false);
-
-    // Refresh list based on selected tab
-    if (gameType == GameType::H1)
+    // refresh list for tab
+    switch (gameType)
+    {
+    case H1:
         populateListH1(treeWidgetH1, Globals.pathH1);
-    else if (gameType == GameType::IW3)
+        break;
+    case IW3:
         populateListIW(treeWidgetIW3, Globals.pathIW3);
-    else if (gameType == GameType::IW4)
-        populateListIW(treeWidgetIW4, Globals.pathIW4);
-    else if (gameType == GameType::IW5)
-        populateListIW(treeWidgetIW5, Globals.pathIW5);
+        break;
+    case IW4:
+        populateListIW(treeWidgetIW3, Globals.pathIW4);
+        break;
+    case IW5:
+        populateListIW(treeWidgetIW3, Globals.pathIW5);
+        break;
+    default:
+        break;
+    }
 }
 
 GameType H1ModTools::getCurrentGameType() {
