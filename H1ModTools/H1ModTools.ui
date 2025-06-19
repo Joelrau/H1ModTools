@@ -132,6 +132,9 @@
        </item>
        <item>
         <layout class="QVBoxLayout" name="verticalLayout_3">
+         <property name="spacing">
+          <number>4</number>
+         </property>
          <item>
           <widget class="QCheckBox" name="generateCsvCheckBox">
            <property name="text">
@@ -215,12 +218,12 @@
        <item>
         <layout class="QVBoxLayout" name="verticalLayout_2">
          <property name="spacing">
-          <number>0</number>
+          <number>4</number>
          </property>
          <item>
           <widget class="QCheckBox" name="cheatsCheckBox">
            <property name="sizePolicy">
-            <sizepolicy hsizetype="Minimum" vsizetype="Minimum">
+            <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
              <horstretch>0</horstretch>
              <verstretch>0</verstretch>
             </sizepolicy>
@@ -236,7 +239,7 @@
          <item>
           <widget class="QCheckBox" name="developerCheckBox">
            <property name="sizePolicy">
-            <sizepolicy hsizetype="Minimum" vsizetype="Minimum">
+            <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
              <horstretch>0</horstretch>
              <verstretch>0</verstretch>
             </sizepolicy>
@@ -265,7 +268,11 @@
   <tabstop>settingsButton</tabstop>
   <tabstop>toolsButton</tabstop>
   <tabstop>tabWidget</tabstop>
+  <tabstop>exportButton</tabstop>
+  <tabstop>generateCsvCheckBox</tabstop>
+  <tabstop>convertGscCheckBox</tabstop>
   <tabstop>buildZoneButton</tabstop>
+  <tabstop>compileReflectionsButton</tabstop>
   <tabstop>runMapButton</tabstop>
   <tabstop>cheatsCheckBox</tabstop>
   <tabstop>developerCheckBox</tabstop>

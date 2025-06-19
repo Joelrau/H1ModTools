@@ -472,9 +472,24 @@ void H1ModTools::on_exportButton_clicked() {
     else
         qInfo() << "Exporting zone" << currentSelectedText;
 
-    disableUiAndStoreState();
+    const auto showH1WidgetForZone = [this](const QString& zone) {
+        const QString sourceFile = Globals.pathH1 + "/zone_source/" + zone + ".csv";
+        if (QFile(sourceFile).exists()) {
+            populateListH1(treeWidgetH1, Globals.pathH1);
+            ui.tabWidget->setCurrentWidget(ui.tabH1);
+            auto items = treeWidgetH1->findItems(zone + ".csv", Qt::MatchExactly | Qt::MatchRecursive);
+            if (!items.isEmpty()) {
+                treeWidgetH1->setCurrentItem(items.first());
+                treeWidgetH1->scrollToItem(treeWidgetH1->currentItem(), QAbstractItemView::PositionAtCenter);
+                treeWidgetH1->setFocus();
+            }
+            updateVisibility();
+        }
+	};
 
-    const auto dumpZone = [=](const QString& zone) {
+    const auto dumpZone = [=](const QString& zone, const bool showH1Widget = false) {
+        disableUiAndStoreState();
+
         QStringList arguments;
         arguments << "-silent" << "-dumpzone" << zone;
 
@@ -499,8 +514,6 @@ void H1ModTools::on_exportButton_clicked() {
                 return;
             }
 
-            const QString sourceFile = Globals.pathH1 + "/zone_source/" + zone + ".csv";
-
             const QString dumpFolder = getGamePath() + "/dump/" + zone;
             const QString destFolder = Globals.pathH1 + "/zonetool/" + zone;
             QtUtils::moveDirectory(dumpFolder, destFolder);
@@ -515,17 +528,10 @@ void H1ModTools::on_exportButton_clicked() {
 
             restoreUiState();
 
-            if (QFile(sourceFile).exists())
-            {
-                //populateListH1(treeWidgetH1, Globals.pathH1);
-				//ui.tabWidget->setCurrentWidget(ui.tabH1);
-                //auto items = treeWidgetH1->findItems(zone + ".csv", Qt::MatchExactly); // this doesn't work
-                //if (!items.isEmpty()) {
-                //    treeWidgetH1->setCurrentItem(items.first());
-                //    treeWidgetH1->scrollToItem(treeWidgetH1->currentItem(), QAbstractItemView::PositionAtCenter);
-                //    treeWidgetH1->setFocus();
-                //}
-            }
+            if(showH1Widget)
+                showH1WidgetForZone(zone);
+
+            return;
         });
 
         process->start();
@@ -533,16 +539,16 @@ void H1ModTools::on_exportButton_clicked() {
             qWarning() << "Failed to start process:" << executable;
             process->deleteLater();
             restoreUiState();
+            return;
         }
     };
 
     if (!isUserMap) {
         const QString zone = QFileInfo(currentSelectedText).completeBaseName();
-        dumpZone(zone);
+        dumpZone(zone, true);
     }
     else {
         // TODO: Handle usermap export logic
-        restoreUiState();
     }
 }
 
