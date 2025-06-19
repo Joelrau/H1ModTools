@@ -9,6 +9,6 @@ A GUI interface for modding _Call of Duty: Modern Warfare Remastered (2016)_, in
 5. Sign the rest of the license agreemenets, and then Qt will finally install
 6. Download and install Qt Visaul Studio Tools [from this link here](https://marketplace.visualstudio.com/items?itemName=TheQtCompany.QtVisualStudioTools2022)
 7. Open the H1ModTools.sln, and go to Tools -> Options to open up the Visual Studio settings
-8. Locate the Qt options, and go to Versions. You can try **Autodetect** or click **Import**, and then go to `C:\Qt`, find your version (mine is 6.9.1), and then click the msvc2022_64 folder and select it.
-9. If you get _"There's no Qt version assigned to project H1ModTools.sln"_ error, right click the Solution, find the Qt menu, and click Qt Project Settings. There, you want to change your Qt Installation to whatever in the dropbox.
-10. You can now build!
+8. Locate the Qt options, and go to Versions. Click **Import**, and then go to `C:\Qt`, and find your version _(mine is 6.9.1)_, and then click the `msvc2022_64` folder and select it. Once you select it, **make sure the name of the version is "MSVC 64-bit"** exactly.
+10. If you get _"There's no Qt version assigned to project H1ModTools.sln"_ error, right click the Solution, find the Qt menu, and click Qt Project Settings. There, you want to change your Qt Installation to whatever in the dropbox.
+11. You can now build!
