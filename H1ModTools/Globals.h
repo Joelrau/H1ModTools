@@ -28,7 +28,7 @@ struct Globals_e
     QString pathIW3;
     QString pathIW4;
     QString pathIW5;
-    QString h1_mod_exe;
+    QString h1Executable;
 };
 
 extern Globals_e Globals;

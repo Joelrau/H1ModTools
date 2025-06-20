@@ -20,7 +20,7 @@ void SettingsDialog::loadSettings()
     ui->lineEditIW3->setText(Globals.pathIW3);
     ui->lineEditIW4->setText(Globals.pathIW4);
     ui->lineEditIW5->setText(Globals.pathIW5);
-    ui->lineEditH1exe->setText(Globals.h1_mod_exe);
+    ui->lineEditH1exe->setText(Globals.h1Executable);
 }
 
 void SettingsDialog::on_buttonBox_accepted() {
@@ -29,7 +29,7 @@ void SettingsDialog::on_buttonBox_accepted() {
     QString iw3Path = ui->lineEditIW3->text().trimmed();
     QString iw4Path = ui->lineEditIW4->text().trimmed();
     QString iw5Path = ui->lineEditIW5->text().trimmed();
-    QString h1_mod_exe = ui->lineEditH1exe->text().trimmed();
+    QString h1Executable = ui->lineEditH1exe->text().trimmed();
 
     struct PathInfo {
         QString label;
@@ -54,7 +54,7 @@ void SettingsDialog::on_buttonBox_accepted() {
     Globals.pathIW3 = iw3Path;
     Globals.pathIW4 = iw4Path;
     Globals.pathIW5 = iw5Path;
-    Globals.h1_mod_exe = h1_mod_exe;
+    Globals.h1Executable = h1Executable;
 
     saveGlobalsToJson(this);
 
