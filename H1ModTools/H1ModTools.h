@@ -1,7 +1,6 @@
 #pragma once
 #include "Globals.h"
 
-#include <QtWidgets/QMainWindow>
 #include "ui_H1ModTools.h"
 
 #include "LogRedirector.h"
@@ -35,7 +34,8 @@ private:
     GameType getCurrentGameType();
 
 private slots:
-	void on_exportButton_clicked();
+    void on_exportButton_clicked();
+    void on_buildAndExportButton_clicked();
 
     void on_runMapButton_clicked();
     void on_compileReflectionsButton_clicked();
@@ -53,7 +53,15 @@ private:
     QTreeWidget* treeWidgetIW4 = nullptr;
     QTreeWidget* treeWidgetIW5 = nullptr;
 
+    void export_map();
+    
+    void buildIW3MapFastfile(const QString& mapName, const QString& cod4Dir);
+    void compileIW3MapReflections(const QString& mapName, const QString& cod4Dir);
+    void compileIW3Map(const QString& mapName, const QString& cod4Dir, const QString& lightOptions);
+
     QMap<QWidget*, bool> m_uiEnabledStates;
+    void updateMapButtonStates(const bool is_visible, const bool is_disabled);
+    void updateExportButtonStates(const bool is_visible, const bool is_disabled);
     void disableUiAndStoreState();
     void restoreUiState();
 };

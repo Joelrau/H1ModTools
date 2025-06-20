@@ -158,6 +158,51 @@
         </layout>
        </item>
        <item>
+        <widget class="QPushButton" name="buildAndExportButton">
+         <property name="text">
+          <string>Build IW3 Map</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <layout class="QVBoxLayout" name="verticalLayout_buildOptions">
+         <item>
+          <widget class="QCheckBox" name="fastCheckBox">
+           <property name="text">
+            <string>Fast</string>
+           </property>
+           <property name="checked">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="extraCheckBox">
+           <property name="text">
+            <string>Extra</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="verboseCheckBox">
+           <property name="text">
+            <string>Verbose</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="modelShadowCheckBox">
+           <property name="text">
+            <string>ModelShadow</string>
+           </property>
+           <property name="checked">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
         <spacer name="horizontalSpacer_3">
          <property name="orientation">
           <enum>Qt::Orientation::Vertical</enum>

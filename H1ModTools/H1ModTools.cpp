@@ -19,6 +19,52 @@ void setupStyle()
 
 namespace Funcs
 {
+    namespace Shared
+    {
+        void readOutputFromProcess(QProcess* process)
+        {
+            auto handleLogLine = [](const QString& line) {
+                // We'll extract and remove the prefix before logging
+                QString trimmedLine = line.trimmed();
+
+                QString message;
+
+                if (trimmedLine.startsWith("[ DEBUG ]", Qt::CaseInsensitive)) {
+                    message = trimmedLine.mid(QString("[ DEBUG ]").length()).trimmed();
+                    qInfo().noquote() << message;
+                }
+                else if (trimmedLine.startsWith("[ INFO ]", Qt::CaseInsensitive)) {
+                    message = trimmedLine.mid(QString("[ INFO ]").length()).trimmed();
+                    qInfo().noquote() << message;
+                }
+                else if (trimmedLine.startsWith("[ WARNING ]", Qt::CaseInsensitive)) {
+                    message = trimmedLine.mid(QString("[ WARNING ]").length()).trimmed();
+                    qWarning().noquote() << message;
+                }
+                else if (trimmedLine.startsWith("[ ERROR ]", Qt::CaseInsensitive)) {
+                    message = trimmedLine.mid(QString("[ ERROR ]").length()).trimmed();
+                    qCritical().noquote() << message;
+                }
+                else if (trimmedLine.startsWith("[ FATAL ]", Qt::CaseInsensitive)) {
+                    message = trimmedLine.mid(QString("[ FATAL ]").length()).trimmed();
+                    qCritical().noquote() << message;  // No app exit
+                }
+                else {
+                    // No prefix found, just log the entire line
+                    qInfo().noquote() << trimmedLine;
+                }
+            };
+
+            QByteArray output = process->readAll();
+            QStringList lines = QString::fromLocal8Bit(output).split('\n', Qt::SkipEmptyParts);
+            for (const QString& line : lines) {
+                if (!line.isEmpty()) {
+                    handleLogLine(line);
+                }
+            }
+        }
+    }
+    
     namespace H1
     {
         bool isMapLoad(const QString& name)
@@ -159,50 +205,13 @@ namespace Funcs
             return usermapsDir.exists() && QFile::exists(usermapsDir.filePath(zone + ".ff"));
         }
     }
-    
-    namespace Shared
+
+    namespace IW3
     {
-        void readOutputFromProcess(QProcess* process)
+        bool isMapSource(const QString& name)
         {
-            auto handleLogLine = [](const QString& line) {
-                // We'll extract and remove the prefix before logging
-                QString trimmedLine = line.trimmed();
-
-                QString message;
-
-                if (trimmedLine.startsWith("[ DEBUG ]", Qt::CaseInsensitive)) {
-                    message = trimmedLine.mid(QString("[ DEBUG ]").length()).trimmed();
-                    qInfo().noquote() << message;
-                }
-                else if (trimmedLine.startsWith("[ INFO ]", Qt::CaseInsensitive)) {
-                    message = trimmedLine.mid(QString("[ INFO ]").length()).trimmed();
-                    qInfo().noquote() << message;
-                }
-                else if (trimmedLine.startsWith("[ WARNING ]", Qt::CaseInsensitive)) {
-                    message = trimmedLine.mid(QString("[ WARNING ]").length()).trimmed();
-                    qWarning().noquote() << message;
-                }
-                else if (trimmedLine.startsWith("[ ERROR ]", Qt::CaseInsensitive)) {
-                    message = trimmedLine.mid(QString("[ ERROR ]").length()).trimmed();
-                    qCritical().noquote() << message;
-                }
-                else if (trimmedLine.startsWith("[ FATAL ]", Qt::CaseInsensitive)) {
-                    message = trimmedLine.mid(QString("[ FATAL ]").length()).trimmed();
-                    qCritical().noquote() << message;  // No app exit
-                }
-                else {
-                    // No prefix found, just log the entire line
-                    qInfo().noquote() << trimmedLine;
-                }
-            };
-
-            QByteArray output = process->readAll();
-            QStringList lines = QString::fromLocal8Bit(output).split('\n', Qt::SkipEmptyParts);
-            for (const QString& line : lines) {
-                if (!line.isEmpty()) {
-                    handleLogLine(line);
-                }
-            }
+            const QDir map_source_dir(Globals.pathIW3 + "/map_source/");
+            return map_source_dir.exists() && QFile::exists(map_source_dir.filePath(name));
         }
     }
 }
@@ -309,17 +318,32 @@ void H1ModTools::setupListWidgets() {
     connectContextMenu(treeWidgetIW4);
     connectContextMenu(treeWidgetIW5);
 
+    // callback for current item changed on H1 tree
     connect(treeWidgetH1, &QTreeWidget::currentItemChanged, this,
         [this](QTreeWidgetItem* current, QTreeWidgetItem* /*previous*/) {
         if (current && current->parent() != nullptr) {  // Ignore root items
             const auto name = QFileInfo(current->text(0)).completeBaseName();
-            qDebug() << "Current item:" << name;
+            qDebug() << "Current H1 item:" << name;
 
             const bool isMap = Funcs::H1::isMap(name);
             ui.compileReflectionsButton->setEnabled(isMap);
             ui.runMapButton->setEnabled(isMap);
             ui.cheatsCheckBox->setEnabled(isMap);
             ui.developerCheckBox->setEnabled(isMap);
+        }
+    });
+
+    // callback for current item changed on IW3 tree
+    connect(treeWidgetIW3, &QTreeWidget::currentItemChanged, this,
+        [this](QTreeWidgetItem* current, QTreeWidgetItem* /*previous*/) {
+        if (current && current->parent() != nullptr) {  // Ignore root items
+            const auto raw_name = QFileInfo(current->text(0)); // get this as string
+            qDebug() << "Current IW3 item:" << raw_name.completeBaseName();
+
+            auto is_map_source = Funcs::IW3::isMapSource(raw_name.fileName());
+
+            updateExportButtonStates(true, is_map_source);
+            updateMapButtonStates(true, !is_map_source);
         }
     });
 }
@@ -400,6 +424,27 @@ void H1ModTools::populateListIW(QTreeWidget* tree, const QString& path) {
         }
     }
 
+    // map_source
+    QDir map_source_dir(path + "/map_source");
+    if (map_source_dir.exists())
+    {
+        auto* map_source_root = new QTreeWidgetItem(tree);
+        map_source_root->setText(0, "map_source");
+        
+        auto boldFont = map_source_root->font(0);
+        boldFont.setBold(true);
+        map_source_root->setFont(0, boldFont);
+        
+        map_source_root->setFlags(Qt::ItemIsEnabled);
+
+        auto map_sources = map_source_dir.entryInfoList({ "*.map" }, QDir::Files);
+        for (const auto& fileInfo : map_sources) {
+            auto* item = new QTreeWidgetItem(map_source_root);
+            item->setText(0, fileInfo.fileName());
+            item->setData(0, Qt::UserRole, fileInfo.filePath());
+        }
+    }
+
     tree->expandAll();
 }
 
@@ -412,14 +457,12 @@ void H1ModTools::populateLists() {
 
 void H1ModTools::updateVisibility() {
     const auto gameType = getCurrentGameType();
-    const auto isH1Selected = gameType == GameType::H1;
+    const auto isH1Selected = gameType == H1;
 
-    const auto canExport = !isH1Selected;
     const auto canCompile = isH1Selected;
 
-    ui.exportButton->setVisible(canExport);
-    ui.generateCsvCheckBox->setVisible(canExport);
-    ui.convertGscCheckBox->setVisible(canExport);
+    updateMapButtonStates(gameType == IW3, true);
+    updateExportButtonStates(isH1Selected == false, false);
 
     ui.buildZoneButton->setVisible(canCompile);
     ui.compileReflectionsButton->setVisible(canCompile);
@@ -454,142 +497,46 @@ GameType H1ModTools::getCurrentGameType() {
     return H1;
 }
 
+void H1ModTools::on_buildAndExportButton_clicked()
+{
+    if (!treeWidgetIW3->currentItem() || !treeWidgetIW3->currentItem()->parent())
+    {
+        qWarning() << "No zone selected.";
+        return;
+    }
+
+    const auto zonetoolIW3 = Globals.pathIW3 + "/zonetool_iw3.exe";
+    if (!QFile::exists(zonetoolIW3))
+    {
+        qCritical() << "zonetool_iw3.exe not found to dump IW3 zone for H1.";
+        restoreUiState();
+        return;
+    }
+
+    const QString mapName = QFileInfo(treeWidgetIW3->currentItem()->text(0)).completeBaseName();
+
+    // TODO: add all the other options here later
+    QStringList lightFlags;
+    if (ui.fastCheckBox->isChecked())
+        lightFlags << "-fast";
+    if (ui.extraCheckBox->isChecked())
+        lightFlags << "-extra";
+    if (ui.verboseCheckBox->isChecked())
+        lightFlags << "-verbose";
+    if (ui.modelShadowCheckBox->isChecked())
+        lightFlags << "-modelshadow";
+
+    const auto lightOptions = lightFlags.join(' ');
+
+    disableUiAndStoreState();
+
+    // build BSP, reflections, & IW3 fastfile using their mod tools
+    // this also handles the rest of the entire process
+    compileIW3Map(mapName, Globals.pathIW3, lightOptions);
+}
+
 void H1ModTools::on_exportButton_clicked() {
-    const auto gameType = getCurrentGameType();
-
-    static const auto getExecutableName = [gameType]() -> QString {
-        switch (gameType)
-        {
-        case GameType::IW3: return "zonetool_iw3.exe";
-        case GameType::IW4: return "zonetool_iw4.exe";
-        case GameType::IW5: return "zonetool_iw5.exe";
-        default:
-            __debugbreak();
-            return "";
-        }
-    };
-
-    static const auto getGamePath = [gameType]() -> QString {
-        switch (gameType) {
-        case GameType::IW3: return Globals.pathIW3;
-        case GameType::IW4: return Globals.pathIW4;
-        case GameType::IW5: return Globals.pathIW5;
-        default:
-            __debugbreak();
-            return "";
-        }
-    };
-
-    const QString executable = getExecutableName();
-    const QString pathStr = getGamePath() + "/" + executable;
-    QFileInfo file(pathStr);
-
-    if (!file.exists() || !file.isExecutable()) {
-        qWarning() << executable << "not found or not executable at" << pathStr;
-        return;
-    }
-
-    const auto getCurrentTreeWidget = [this, gameType]() {
-        switch (gameType) {
-        case GameType::IW3: return treeWidgetIW3;
-        case GameType::IW4: return treeWidgetIW4;
-        case GameType::IW5: return treeWidgetIW5;
-        default:
-            return static_cast<QTreeWidget*>(nullptr);
-        }
-    };
-
-    auto* widget = getCurrentTreeWidget();
-    if (!widget || !widget->currentItem() || !widget->currentItem()->parent())
-        return;
-
-    const QString currentSelectedText = widget->currentItem()->text(0);
-    const QString currentSelectedPath = widget->currentItem()->data(0, Qt::UserRole).toString();
-    const bool isUserMap = currentSelectedPath.contains("usermaps");
-
-    if (isUserMap)
-        qInfo() << "Exporting map" << currentSelectedText;
-    else
-        qInfo() << "Exporting zone" << currentSelectedText;
-
-    const auto showH1WidgetForZone = [this](const QString& zone) {
-        const QString sourceFile = Globals.pathH1 + "/zone_source/" + zone + ".csv";
-        if (QFile(sourceFile).exists()) {
-            populateListH1(treeWidgetH1, Globals.pathH1);
-            ui.tabWidget->setCurrentWidget(ui.tabH1);
-            auto items = treeWidgetH1->findItems(zone + ".csv", Qt::MatchExactly | Qt::MatchRecursive);
-            if (!items.isEmpty()) {
-                treeWidgetH1->setCurrentItem(items.first());
-                treeWidgetH1->scrollToItem(treeWidgetH1->currentItem(), QAbstractItemView::PositionAtCenter);
-                treeWidgetH1->setFocus();
-            }
-            updateVisibility();
-        }
-	};
-
-    const auto dumpZone = [=](const QString& zone, const bool showH1Widget = false) {
-        disableUiAndStoreState();
-
-        QStringList arguments;
-        arguments << "-silent" << "-dumpzone" << zone;
-
-        QProcess* process = new QProcess(this);
-        process->setProgram(pathStr);
-        process->setArguments(arguments);
-        process->setWorkingDirectory(file.absolutePath());
-        process->setProcessChannelMode(QProcess::MergedChannels);
-
-        connect(process, &QProcess::readyRead, [process]() {
-            Funcs::Shared::readOutputFromProcess(process);
-        });
-
-        connect(process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
-            this, [=](int exitCode, QProcess::ExitStatus status) {
-            Funcs::Shared::readOutputFromProcess(process);
-            process->deleteLater();
-
-            if (status != QProcess::NormalExit || exitCode != 0) {
-                qCritical() << executable << "exited with error during zone export.";
-                restoreUiState();
-                return;
-            }
-
-            const QString dumpFolder = getGamePath() + "/dump/" + zone;
-            const QString destFolder = Globals.pathH1 + "/zonetool/" + zone;
-            QtUtils::moveDirectory(dumpFolder, destFolder);
-
-            if (ui.convertGscCheckBox->isChecked()) {
-                // fixup GSC...
-            }
-
-            if (ui.generateCsvCheckBox->isChecked()) {
-                // generate CSV...
-            }
-
-            restoreUiState();
-
-            if (showH1Widget)
-                showH1WidgetForZone(zone);
-
-            return;
-        });
-
-        process->start();
-        if (!process->waitForStarted()) {
-            qWarning() << "Failed to start process:" << executable;
-            process->deleteLater();
-            restoreUiState();
-            return;
-        }
-    };
-
-    if (!isUserMap) {
-        const QString zone = QFileInfo(currentSelectedText).completeBaseName();
-        dumpZone(zone, true);
-    }
-    else {
-        // TODO: Handle usermap export logic
-    }
+    export_map();
 }
 
 void H1ModTools::on_buildZoneButton_clicked() {
@@ -660,9 +607,7 @@ void H1ModTools::on_buildZoneButton_clicked() {
     if (!process->waitForStarted()) {
         qWarning() << "Failed to start" << executable;
         process->deleteLater();
-
         restoreUiState();
-        return;
     }
 }
 
@@ -863,6 +808,444 @@ void H1ModTools::onTreeContextMenuRequested(const QPoint& pos) {
 #endif
 }
 
+// export
+void H1ModTools::export_map()
+{
+    const auto gameType = getCurrentGameType();
+    
+    static const auto getExecutableName = [gameType]() -> QString {
+        switch (gameType)
+        {
+        case IW3: return "zonetool_iw3.exe";
+        case IW4: return "zonetool_iw4.exe";
+        case IW5: return "zonetool_iw5.exe";
+        default:
+            __debugbreak();
+            return "";
+        }
+    };
+
+    static const auto getGamePath = [gameType]() -> QString {
+        switch (gameType) {
+        case IW3: return Globals.pathIW3;
+        case IW4: return Globals.pathIW4;
+        case IW5: return Globals.pathIW5;
+        default:
+            __debugbreak();
+            return "";
+        }
+    };
+
+    const QString executable = getExecutableName();
+    const QString pathStr = getGamePath() + "/" + executable;
+    QFileInfo file(pathStr);
+
+    if (!file.exists() || !file.isExecutable()) {
+        qWarning() << executable << "not found or not executable at" << pathStr;
+        return;
+    }
+
+    const auto getCurrentTreeWidget = [this, gameType]() {
+        switch (gameType) {
+        case IW3: return treeWidgetIW3;
+        case IW4: return treeWidgetIW4;
+        case IW5: return treeWidgetIW5;
+        default:
+            return static_cast<QTreeWidget*>(nullptr);
+        }
+    };
+
+    auto* widget = getCurrentTreeWidget();
+    if (!widget || !widget->currentItem() || !widget->currentItem()->parent())
+        return;
+
+    const QString currentSelectedText = widget->currentItem()->text(0);
+    const QString currentSelectedPath = widget->currentItem()->data(0, Qt::UserRole).toString();
+    const bool isUserMap = currentSelectedPath.contains("usermaps");
+
+    if (isUserMap)
+        qInfo() << "Exporting map" << currentSelectedText;
+    else
+        qInfo() << "Exporting zone" << currentSelectedText;
+
+    const auto showH1WidgetForZone = [this](const QString& zone) {
+        const QString sourceFile = Globals.pathH1 + "/zone_source/" + zone + ".csv";
+        if (QFile(sourceFile).exists()) {
+            populateListH1(treeWidgetH1, Globals.pathH1);
+            ui.tabWidget->setCurrentWidget(ui.tabH1);
+            auto items = treeWidgetH1->findItems(zone + ".csv", Qt::MatchExactly | Qt::MatchRecursive);
+            if (!items.isEmpty()) {
+                treeWidgetH1->setCurrentItem(items.first());
+                treeWidgetH1->scrollToItem(treeWidgetH1->currentItem(), QAbstractItemView::PositionAtCenter);
+                treeWidgetH1->setFocus();
+            }
+            updateVisibility();
+        }
+	};
+
+    const auto dumpZone = [=](const QString& zone, const bool showH1Widget = false) {
+        disableUiAndStoreState();
+
+        QStringList arguments;
+        arguments << "-silent" << "-dumpzone" << zone;
+
+        QProcess* process = new QProcess(this);
+        process->setProgram(pathStr);
+        process->setArguments(arguments);
+        process->setWorkingDirectory(file.absolutePath());
+        process->setProcessChannelMode(QProcess::MergedChannels);
+
+        connect(process, &QProcess::readyRead, [process]() {
+            Funcs::Shared::readOutputFromProcess(process);
+        });
+
+        connect(process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, [=](int exitCode, QProcess::ExitStatus status) {
+            Funcs::Shared::readOutputFromProcess(process);
+            process->deleteLater();
+
+            if (status != QProcess::NormalExit || exitCode != 0) {
+                qCritical() << executable << "exited with error during zone export.";
+                restoreUiState();
+                return;
+            }
+
+            const QString dumpFolder = getGamePath() + "/dump/" + zone;
+            const QString destFolder = Globals.pathH1 + "/zonetool/" + zone;
+            QtUtils::moveDirectory(dumpFolder, destFolder);
+
+            if (ui.convertGscCheckBox->isChecked()) {
+                // fixup GSC...
+            }
+
+            if (ui.generateCsvCheckBox->isChecked()) {
+                // generate CSV...
+            }
+
+            restoreUiState();
+
+            if (showH1Widget)
+                showH1WidgetForZone(zone);
+        });
+
+        process->start();
+        if (!process->waitForStarted()) {
+            qWarning() << "Failed to start process:" << executable;
+            process->deleteLater();
+            restoreUiState();
+        }
+    };
+
+    if (!isUserMap) {
+        const QString zone = QFileInfo(currentSelectedText).completeBaseName();
+        dumpZone(zone, true);
+    }
+    else {
+        // TODO: Handle usermap export logic
+    }
+}
+
+// used for IW3 map source building inside H1 mod tools
+void H1ModTools::buildIW3MapFastfile(const QString& mapName, const QString& cod4Dir)
+{
+    const auto linkerPath = cod4Dir + "/bin/linker_pc.exe";
+    const auto zoneSourceDir = cod4Dir + "/zone_source";
+    const auto zoneDir = cod4Dir + "/zone";
+
+    if (!QFile::exists(linkerPath)) {
+        qCritical() << "Missing linker_pc.exe at" << linkerPath;
+        restoreUiState();
+        return;
+    }
+
+    const auto hasMapCsv = QFile::exists(zoneSourceDir + "/" + mapName + "_load.csv");
+    if (!hasMapCsv)
+    {
+        qCritical() << "Failed to find map CSV for map" << mapName;
+        restoreUiState();
+        return;
+    }
+
+    const auto hasLoadCsv = QFile::exists(zoneSourceDir + "/" + mapName + "_load.csv");
+
+    QStringList fastfiles;
+    fastfiles << mapName;
+
+    // load csv not required, but warn the user
+    if (hasLoadCsv)
+    {
+        fastfiles << (mapName + "_load");
+    }
+    else
+    {
+        qWarning() << "Failed to find load CSV for map" << mapName;
+    }
+
+    QProcess* linkerProc = new QProcess();
+    linkerProc->setProgram(linkerPath);
+    linkerProc->setWorkingDirectory(zoneSourceDir);
+    linkerProc->setProcessChannelMode(QProcess::MergedChannels);
+
+    QStringList args;
+    args << "-language english" << fastfiles;
+
+    linkerProc->setArguments(args);
+
+    QObject::connect(linkerProc, &QProcess::readyRead, [=]() {
+        Funcs::Shared::readOutputFromProcess(linkerProc);
+    });
+
+    QObject::connect(linkerProc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+        [=](int exitCode, QProcess::ExitStatus status)
+        {
+            Funcs::Shared::readOutputFromProcess(linkerProc);
+            linkerProc->deleteLater();
+
+            if (exitCode != 0 || status != QProcess::NormalExit) {
+                qCritical() << "Fastfile build failed for" << mapName;
+                restoreUiState();
+                return;
+            }
+
+            qDebug() << "Fastfiles built successfully for" << mapName;
+
+            // TODO: move to localized folder if needed (non-english)
+            /*
+            const auto engFolder = zoneDir + "/english";
+            const auto langFolder = zoneDir + "/english"; // change if other languages supported
+
+            for (const QString& zone : fastfiles) {
+                const auto src = engFolder + "/" + zone + ".ff";
+                const auto dst = langFolder + "/" + zone + ".ff";
+                if (QFile::exists(src)) {
+                    QFile::remove(dst);
+                    QFile::rename(src, dst);
+                }
+            }
+            */
+
+            // TODO: dump the IW3 zone for H1, and move to zonetool
+            // or just simply show the new .ff that can be exported with the export button
+            //export_map();
+        });
+
+    qDebug() << "Building fastfiles for" << fastfiles.join(", ");
+    linkerProc->start();
+}
+
+void H1ModTools::compileIW3MapReflections(const QString& mapName, const QString& cod4Dir)
+{
+    const auto isMP = mapName.startsWith("mp_");
+    const auto toolExe = isMP ? "mp_tool.exe" : "sp_tool.exe";
+    const auto toolPath = cod4Dir + "/" + toolExe;
+
+    if (!QFile::exists(toolPath)) {
+        qCritical() << "Missing executable:" << toolPath;
+        restoreUiState();
+        return;
+    }
+
+    QProcess* proc = new QProcess();
+    proc->setProgram(toolPath);
+    proc->setWorkingDirectory(cod4Dir);
+    proc->setProcessChannelMode(QProcess::MergedChannels);
+
+    QStringList args = {
+        "+set", "r_fullscreen", "0",
+        "+set", "loc_warnings", "0",
+        "+set", "developer", "1",
+        "+set", "developer_script", "1",
+        "+set", "logfile", "2",
+        "+set", "thereisacow", "1337",
+        "+set", "sv_pure", "0",
+        "+set", "useFastFile", "0",
+        "+set", "com_introplayed", "1",
+        "+set", "ui_autoContinue", "1",
+        "+set", "r_reflectionProbeGenerateExit", "1",
+        "+set", "com_hunkMegs", "512",
+        "+set", "r_reflectionProbeRegenerateAll", "1",
+        "+set", "r_dof_enable", "0",
+        "+set", "r_zFeather", "1",
+        "+set", "sys_smp_allowed", "0",
+        "+set", "r_reflectionProbeGenerate", "1",
+        "+devmap", mapName
+    };
+
+    proc->setArguments(args);
+
+    connect(proc, &QProcess::readyRead, [=]() {
+        Funcs::Shared::readOutputFromProcess(proc);
+    });
+
+    connect(proc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+        [=](int exitCode, QProcess::ExitStatus status)
+        {
+            Funcs::Shared::readOutputFromProcess(proc);
+            proc->deleteLater();
+
+            if (exitCode != 0 || status != QProcess::NormalExit) {
+                qCritical() << "Reflection generation failed.";
+                restoreUiState();
+                return;
+            }
+
+            qDebug() << "Reflection probe generation complete for" << mapName;
+
+            // finally, build the IW3 fastfile
+            buildIW3MapFastfile(mapName, cod4Dir);
+        });
+
+    qDebug() << "Launching" << toolExe << "to generate reflections for" << mapName;
+    proc->start();
+}
+
+void H1ModTools::compileIW3Map(const QString& mapName, const QString& cod4Dir, const QString& lightOptions)
+{
+    const auto bsppath = cod4Dir + "/raw/maps" + (mapName.startsWith("mp_") ? "/mp" : "");
+    const auto mapSourcePath = cod4Dir + "/map_source";
+    const auto treePath = cod4Dir + "/";
+    const auto binPath = cod4Dir + "/bin/";
+
+    const auto cod4mapPath = binPath + "cod4map.exe";
+    const auto cod4radPath = binPath + "cod4rad.exe";
+    const auto spToolPath = cod4Dir + "/sp_tool.exe";
+
+    if (!QFile::exists(cod4mapPath) || !QFile::exists(cod4radPath)) {
+        qCritical() << "Missing cod4map or cod4rad.";
+        restoreUiState();
+        return;
+    }
+
+    if (!QDir().mkpath(bsppath)) {
+        qCritical() << "Couldn't create path:" << bsppath;
+        restoreUiState();
+        return;
+    }
+
+    // ---- copy source map to bsp path temporarily 
+    const auto srcMap = mapSourcePath + "/" + mapName + ".map";
+    const auto dstMap = bsppath + "/" + mapName + ".map";
+    QFile::remove(dstMap); // overwrite
+    QFile::copy(srcMap, dstMap);
+
+    // ---- compile BSP
+    qDebug() << "Compiling BSP...";
+    auto* cod4mapProc = new QProcess();
+    cod4mapProc->setProgram(cod4mapPath);
+    cod4mapProc->setWorkingDirectory(cod4Dir);
+    cod4mapProc->setProcessChannelMode(QProcess::MergedChannels);
+    cod4mapProc->setArguments(QStringList{ "-platform", "pc", "-loadFrom", srcMap, dstMap }); // TODO: add bsp options later
+
+    connect(cod4mapProc, &QProcess::readyRead, [cod4mapProc]() {
+        Funcs::Shared::readOutputFromProcess(cod4mapProc);
+    });
+
+    connect(cod4mapProc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+        [=](int exitCode, QProcess::ExitStatus status) {
+            Funcs::Shared::readOutputFromProcess(cod4mapProc);
+            cod4mapProc->deleteLater();
+
+            if (exitCode != 0 || status != QProcess::NormalExit) {
+                qCritical() << "BSP compile failed.";
+                restoreUiState();
+                return;
+            }
+
+            // ---- compile light
+            qDebug() << "Compiling lighting...";
+            const auto srcGrid = mapSourcePath + "/" + mapName + ".grid";
+            const auto dstGrid = bsppath + "/" + mapName + ".grid";
+            if (QFile::exists(srcGrid)) {
+                QFile::remove(dstGrid);
+                QFile::copy(srcGrid, dstGrid);
+            }
+
+            auto* cod4radProc = new QProcess();
+            cod4radProc->setProgram(cod4radPath);
+            cod4radProc->setWorkingDirectory(cod4Dir);
+            cod4radProc->setProcessChannelMode(QProcess::MergedChannels);
+
+            QStringList radArgs{ "-platform", "pc" };
+            if (!lightOptions.trimmed().isEmpty())
+                radArgs.append(lightOptions.trimmed().split(' '));
+            radArgs << bsppath + "/" + mapName;
+
+            cod4radProc->setArguments(radArgs);
+
+            connect(cod4radProc, &QProcess::readyRead, [cod4radProc]() {
+                Funcs::Shared::readOutputFromProcess(cod4radProc);
+            });
+
+            connect(cod4radProc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+                [=](int lightExitCode, QProcess::ExitStatus lightStatus) {
+                    Funcs::Shared::readOutputFromProcess(cod4radProc);
+                    cod4radProc->deleteLater();
+
+                    if (lightExitCode != 0 || lightStatus != QProcess::NormalExit) {
+                        qCritical() << "Lighting compile failed.";
+                        restoreUiState();
+                        return;
+                    }
+
+                    // ---- cleanup
+                    for (const QString& ext : { ".map", ".d3dprt", ".d3dpoly", ".vclog", ".grid" })
+                        QFile::remove(bsppath + "/" + mapName + ext);
+
+                    // ----move .lin if exists
+                    const QString linSrc = bsppath + "/" + mapName + ".lin";
+                    const QString linDst = mapSourcePath + "/" + mapName + ".lin";
+                    if (QFile::exists(linSrc)) {
+                        QFile::remove(linDst);
+                        QFile::rename(linSrc, linDst);
+                    }
+
+                    // TODO: connect paths later with sp tool?
+
+                    qDebug() << mapName << "has been compiled for IW3";
+
+                    // now, we need to generate the reflections for the map
+                    compileIW3MapReflections(mapName, cod4Dir);
+                });
+
+            cod4radProc->start();
+        });
+
+    cod4mapProc->start();
+}
+
+// ui state
+void H1ModTools::updateMapButtonStates(const bool is_visible, const bool is_disabled)
+{
+    static const QList<QWidget*> map_build_widgets = {
+        ui.buildAndExportButton,
+        ui.fastCheckBox,
+        ui.extraCheckBox,
+        ui.verboseCheckBox,
+        ui.modelShadowCheckBox
+    };
+
+    for (auto* widget : map_build_widgets)
+    {
+        widget->setVisible(is_visible);
+        widget->setDisabled(is_disabled);
+    }
+}
+
+void H1ModTools::updateExportButtonStates(const bool is_visible, const bool is_disabled)
+{
+    static const QList<QWidget*> map_build_widgets = {
+        ui.exportButton,
+        ui.generateCsvCheckBox,
+        ui.convertGscCheckBox
+    };
+
+    for (auto* widget : map_build_widgets)
+    {
+        widget->setVisible(is_visible);
+        widget->setDisabled(is_disabled);
+    }
+}
+
 void H1ModTools::disableUiAndStoreState() {
     QList<QWidget*> widgets = {
         ui.buildZoneButton,
@@ -875,6 +1258,11 @@ void H1ModTools::disableUiAndStoreState() {
         ui.developerCheckBox,
         ui.generateCsvCheckBox,
         ui.convertGscCheckBox,
+        ui.buildAndExportButton,
+        ui.fastCheckBox,
+        ui.extraCheckBox,
+        ui.verboseCheckBox,
+        ui.modelShadowCheckBox
     };
 
     m_uiEnabledStates.clear();
