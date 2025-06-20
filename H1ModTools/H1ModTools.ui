@@ -125,8 +125,21 @@
        </item>
        <item>
         <widget class="QPushButton" name="exportButton">
+         <property name="layoutDirection">
+          <enum>Qt::LayoutDirection::RightToLeft</enum>
+         </property>
          <property name="text">
-          <string>Export for H1</string>
+          <string>Export</string>
+         </property>
+         <property name="icon">
+          <iconset resource="H1ModTools.qrc">
+           <normaloff>:/H1ModTools/Resources/h1_icon.png</normaloff>:/H1ModTools/Resources/h1_icon.png</iconset>
+         </property>
+         <property name="iconSize">
+          <size>
+           <width>16</width>
+           <height>16</height>
+          </size>
          </property>
         </widget>
        </item>
