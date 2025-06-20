@@ -11,7 +11,9 @@ void saveGlobalsToJson(QWidget* parent)
     paths["iw3"] = Globals.pathIW3;
     paths["iw4"] = Globals.pathIW4;
     paths["iw5"] = Globals.pathIW5;
+    
     settings["paths"] = paths;
+    settings["h1_mod_exe"] = Globals.h1_mod_exe;
 
     QFile file("settings.json");
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
@@ -47,6 +49,7 @@ bool loadGlobalsFromJson()
     Globals.pathIW3 = paths["iw3"].toString();
     Globals.pathIW4 = paths["iw4"].toString();
     Globals.pathIW5 = paths["iw5"].toString();
+    Globals.h1_mod_exe = obj["h1_mod_exe"].toString();
 
     return true;
 }

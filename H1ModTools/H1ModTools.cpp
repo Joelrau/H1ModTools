@@ -239,7 +239,8 @@ void generateSettings(QWidget* parent) {
     Globals.pathIW3 = findGameFolderInAllDrives("Call of Duty 4");
     Globals.pathIW4 = findGameFolderInAllDrives("Call of Duty Modern Warfare 2");
     Globals.pathIW5 = findGameFolderInAllDrives("Call of Duty Modern Warfare 3");
-
+    Globals.h1_mod_exe = "h1-mod_dev.exe";
+    
     saveGlobalsToJson(parent);
 
     qDebug() << "Generated settings.json with auto-discovered paths.";
@@ -636,7 +637,7 @@ void H1ModTools::on_buildZoneButton_clicked() {
 }
 
 void H1ModTools::on_compileReflectionsButton_clicked() {
-    const QString executable = "h1-mod_dev.exe";
+    const QString executable = Globals.h1_mod_exe;
     const QString pathStr = Globals.pathH1 + "/" + executable;
     QFileInfo file(pathStr);
 
@@ -700,7 +701,7 @@ void H1ModTools::on_compileReflectionsButton_clicked() {
 }
 
 void H1ModTools::on_runMapButton_clicked() {
-    const QString executable = "h1-mod_dev.exe";
+    const QString executable = Globals.h1_mod_exe;
     const QString pathStr = Globals.pathH1 + "/" + executable;
     QFileInfo file(pathStr);
 
