@@ -351,6 +351,24 @@ void H1ModTools::setupListWidgets()
             updateMapButtonStates(true, !is_map_source);
         }
     });
+
+    // callback for current item changed on IW4 tree
+    connect(treeWidgetIW4, &QTreeWidget::currentItemChanged, this,
+        [this](QTreeWidgetItem* current, QTreeWidgetItem* /*previous*/) {
+        if (current && current->parent() != nullptr) {  // Ignore root items
+            const auto raw_name = QFileInfo(current->text(0)); // get this as string
+            qDebug() << "Current IW4 item:" << raw_name.completeBaseName();
+        }
+    });
+
+    // callback for current item changed on IW5 tree
+    connect(treeWidgetIW5, &QTreeWidget::currentItemChanged, this,
+        [this](QTreeWidgetItem* current, QTreeWidgetItem* /*previous*/) {
+        if (current && current->parent() != nullptr) {  // Ignore root items
+            const auto raw_name = QFileInfo(current->text(0)); // get this as string
+            qDebug() << "Current IW5 item:" << raw_name.completeBaseName();
+        }
+    });
 }
 
 void H1ModTools::populateListH1(QTreeWidget* tree, const QString& path)
@@ -903,7 +921,9 @@ void H1ModTools::export_map()
         disableUiAndStoreState();
 
         QStringList arguments;
-        arguments << "-silent" << "-dumpzone" << zone;
+        arguments 
+            << "-silent" 
+            << "-dumpzone" << zone;
 
         QProcess* process = new QProcess(this);
         process->setProgram(pathStr);
@@ -1024,6 +1044,7 @@ void H1ModTools::buildIW3MapFastfile(const QString& mapName, const QString& cod4
             }
 
             qDebug() << "Fastfiles built successfully for" << mapName;
+            restoreUiState();
 
             // TODO: move to localized folder if needed (non-english)
             /*
