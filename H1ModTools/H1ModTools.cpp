@@ -129,7 +129,37 @@ namespace Funcs
 
             return true;
         }
+
+        bool zoneExistsOnDisk(const QString& zone)
+        {
+            // check if zone has it
+            QDir zoneDir(Globals.pathH1 + "/zone");
+            QStringList matchingFiles = zoneDir.entryList(QStringList{ zone + ".ff" },
+                                                          QDir::Files | QDir::NoSymLinks | QDir::NoDotAndDotDot,
+                                                          QDir::Name | QDir::IgnoreCase);
+
+            if (!matchingFiles.isEmpty())
+            {
+                return true;
+            }
+
+            // check all subdirectories in zone
+            const auto subDirs = zoneDir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot);
+            for (const QFileInfo& subDir : subDirs)
+            {
+                QDir sub(subDir.absoluteFilePath());
+                if (sub.exists(zone + ".ff"))
+                {
+                    return true;
+                }
+            }
+
+            // check if it is a usermap
+            QDir usermapsDir(Globals.pathH1 + "/usermaps/" + zone);
+            return usermapsDir.exists() && QFile::exists(usermapsDir.filePath(zone + ".ff"));
+        }
     }
+    
     namespace Shared
     {
         void readOutputFromProcess(QProcess* process)
@@ -652,6 +682,15 @@ void H1ModTools::on_compileReflectionsButton_clicked() {
     const QString currentSelectedText = treeWidgetH1->currentItem()->text(0);
     const QString currentSelectedZone = QFileInfo(currentSelectedText).completeBaseName();
 
+    // check if the zone actually exists
+    if (!Funcs::H1::zoneExistsOnDisk(currentSelectedZone))
+    {
+        QApplication::beep();
+        qCritical() << "You must build the zone before you can use Compile Reflections for " << currentSelectedZone;
+        restoreUiState();
+        return;
+    }
+
     // Compile reflections
     QStringList arguments;
     arguments << "-multiplayer"
@@ -715,6 +754,15 @@ void H1ModTools::on_runMapButton_clicked() {
 
     const QString currentSelectedText = treeWidgetH1->currentItem()->text(0);
     const QString currentSelectedZone = QFileInfo(currentSelectedText).completeBaseName();
+
+    // check if the zone actually exists
+    if (!Funcs::H1::zoneExistsOnDisk(currentSelectedZone))
+    {
+        QApplication::beep();
+        qCritical() << "You must build the zone before you can use Run Map for " << currentSelectedZone;
+        restoreUiState();
+        return;
+    }
 
     const bool isMP = currentSelectedZone.startsWith("mp_");
 
