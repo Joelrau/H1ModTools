@@ -242,14 +242,16 @@ H1ModTools::H1ModTools(QWidget *parent)
 H1ModTools::~H1ModTools()
 {}
 
-void H1ModTools::on_settingsButton_clicked() {
+void H1ModTools::on_settingsButton_clicked()
+{
     SettingsDialog dlg(this);
     if (dlg.exec() == QDialog::Accepted) {
         populateLists();
     }
 }
 
-QString findGameFolderInAllDrives(const QString& folderName) {
+QString findGameFolderInAllDrives(const QString& folderName)
+{
     const QStringList potentialSteamPaths = {
         "Program Files/Steam/steamapps/common/",
         "Program Files (x86)/Steam/steamapps/common/",
@@ -273,7 +275,8 @@ QString findGameFolderInAllDrives(const QString& folderName) {
     return {};
 }
 
-void generateSettings(QWidget* parent) {
+void generateSettings(QWidget* parent)
+{
     Globals.pathH1 = findGameFolderInAllDrives("Call of Duty Modern Warfare Remastered");
     Globals.pathIW3 = findGameFolderInAllDrives("Call of Duty 4");
     Globals.pathIW4 = findGameFolderInAllDrives("Call of Duty Modern Warfare 2");
@@ -285,14 +288,16 @@ void generateSettings(QWidget* parent) {
     qDebug() << "Generated settings.json with auto-discovered paths.";
 }
 
-void H1ModTools::loadGlobals() {
+void H1ModTools::loadGlobals()
+{
     if (!loadGlobalsFromJson()) {
         // No settings found, let's generate!
         generateSettings(this);
     }
 }
 
-void H1ModTools::setupListWidgets() {
+void H1ModTools::setupListWidgets()
+{
     // Create and layout each QTreeWidget inside the corresponding tab
     auto setupTabTree = [](QWidget* tab, QTreeWidget*& treeWidget) {
         treeWidget = new QTreeWidget(tab);
@@ -348,7 +353,8 @@ void H1ModTools::setupListWidgets() {
     });
 }
 
-void H1ModTools::populateListH1(QTreeWidget* tree, const QString& path) {
+void H1ModTools::populateListH1(QTreeWidget* tree, const QString& path)
+{
     tree->clear();
 
     QDir zoneSourceDir(path + "/zone_source");
@@ -374,7 +380,8 @@ void H1ModTools::populateListH1(QTreeWidget* tree, const QString& path) {
     tree->expandAll();
 }
 
-void H1ModTools::populateListIW(QTreeWidget* tree, const QString& path) {
+void H1ModTools::populateListIW(QTreeWidget* tree, const QString& path)
+{
     tree->clear();
 
     const QStringList languageFolders = {
@@ -448,14 +455,16 @@ void H1ModTools::populateListIW(QTreeWidget* tree, const QString& path) {
     tree->expandAll();
 }
 
-void H1ModTools::populateLists() {
+void H1ModTools::populateLists()
+{
     populateListH1(treeWidgetH1, Globals.pathH1);
     populateListIW(treeWidgetIW3, Globals.pathIW3);
     populateListIW(treeWidgetIW4, Globals.pathIW4);
     populateListIW(treeWidgetIW5, Globals.pathIW5);
 }
 
-void H1ModTools::updateVisibility() {
+void H1ModTools::updateVisibility()
+{
     const auto gameType = getCurrentGameType();
     const auto isH1Selected = gameType == H1;
 
@@ -490,7 +499,8 @@ void H1ModTools::updateVisibility() {
     }
 }
 
-GameType H1ModTools::getCurrentGameType() {
+GameType H1ModTools::getCurrentGameType()
+{
     if (ui.tabWidget->currentWidget() == ui.tabIW3) return IW3;
     if (ui.tabWidget->currentWidget() == ui.tabIW4) return IW4;
     if (ui.tabWidget->currentWidget() == ui.tabIW5) return IW5;
@@ -535,11 +545,13 @@ void H1ModTools::on_buildAndExportButton_clicked()
     compileIW3Map(mapName, Globals.pathIW3, lightOptions);
 }
 
-void H1ModTools::on_exportButton_clicked() {
+void H1ModTools::on_exportButton_clicked()
+{
     export_map();
 }
 
-void H1ModTools::on_buildZoneButton_clicked() {
+void H1ModTools::on_buildZoneButton_clicked()
+{
     const QString executable = "zonetool.exe";
     const QString pathStr = Globals.pathH1 + "/" + executable;
     QFileInfo file(pathStr);
@@ -611,7 +623,8 @@ void H1ModTools::on_buildZoneButton_clicked() {
     }
 }
 
-void H1ModTools::on_compileReflectionsButton_clicked() {
+void H1ModTools::on_compileReflectionsButton_clicked()
+{
     const QString executable = Globals.h1_mod_exe;
     const QString pathStr = Globals.pathH1 + "/" + executable;
     QFileInfo file(pathStr);
@@ -684,7 +697,8 @@ void H1ModTools::on_compileReflectionsButton_clicked() {
     }
 }
 
-void H1ModTools::on_runMapButton_clicked() {
+void H1ModTools::on_runMapButton_clicked()
+{
     const QString executable = Globals.h1_mod_exe;
     const QString pathStr = Globals.pathH1 + "/" + executable;
     QFileInfo file(pathStr);
@@ -731,7 +745,8 @@ void H1ModTools::on_runMapButton_clicked() {
     }
 }
 
-void H1ModTools::onOutputBufferContextMenu(const QPoint& pos) {
+void H1ModTools::onOutputBufferContextMenu(const QPoint& pos)
+{
     QMenu* menu = ui.outputBuffer->createStandardContextMenu();
     menu->addSeparator();
 
@@ -745,7 +760,8 @@ void H1ModTools::onOutputBufferContextMenu(const QPoint& pos) {
     delete menu;  // clean up
 }
 
-void H1ModTools::onTreeContextMenuRequested(const QPoint& pos) {
+void H1ModTools::onTreeContextMenuRequested(const QPoint& pos)
+{
     auto* tree = qobject_cast<QTreeWidget*>(sender());
     if (!tree) return;
 
