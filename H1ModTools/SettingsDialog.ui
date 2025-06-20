@@ -179,14 +179,14 @@
         </size>
        </property>
        <property name="text">
-        <string>H1-Mod exe:</string>
+        <string>H1 exe:</string>
        </property>
       </widget>
      </item>
      <item>
       <widget class="QLineEdit" name="lineEditH1exe">
        <property name="toolTip">
-        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;h1-mod client exe name&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;h1 client exe name&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
        </property>
       </widget>
      </item>
