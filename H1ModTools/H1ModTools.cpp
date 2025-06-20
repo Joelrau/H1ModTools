@@ -17,10 +17,41 @@ void setupStyle()
     }
 }
 
+const QStringList languageFolders = {
+        "english", "french", "german", "spanish",
+        "japanese", "russian", "italian", "dlc"
+};
+
 namespace Funcs
 {
     namespace Shared
     {
+        static QString getGamePath(GameType gameType)
+        {
+            switch (gameType) {
+            case GameType::IW3: return Globals.pathIW3;
+            case GameType::IW4: return Globals.pathIW4;
+            case GameType::IW5: return Globals.pathIW5;
+            default:
+                __debugbreak();
+                return "";
+            }
+        };
+
+        static bool zoneExistsForDump(const QString& zone, GameType gameType)
+        {
+            // check each language folder
+            QDir zoneDir(getGamePath(gameType) + "/zone/");
+            if (!zoneDir.exists()) return false;
+            for (const QString& lang : languageFolders) {
+                QDir langDir(zoneDir.filePath(lang));
+                if (langDir.exists() && QFile::exists(langDir.filePath(zone + ".ff"))) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         void readOutputFromProcess(QProcess* process)
         {
             auto handleLogLine = [](const QString& line) {
@@ -86,8 +117,7 @@ namespace Funcs
 
         bool moveToUsermaps(const QString& zone)
         {
-            const auto tryMoveFile = [](const QString& folder, const QString& zoneName, const QString& ext = "") -> bool
-            {
+            const auto tryMoveFile = [](const QString& folder, const QString& zoneName, const QString& ext = "") -> bool {
                 QString sourcePath = Globals.pathH1 + "/zone/" + zoneName + ext;
                 QString targetFolder = Globals.pathH1 + "/usermaps/" + folder;
 
@@ -96,8 +126,7 @@ namespace Funcs
                     return false;
 
                 QDir dir;
-                if (!dir.exists(targetFolder))
-                {
+                if (!dir.exists(targetFolder)) {
                     if (!dir.mkpath(targetFolder))
                         return false;
                 }
@@ -109,8 +138,7 @@ namespace Funcs
                 return sourceFile.rename(targetPath);
             };
 
-            if (isMapLoad(zone))
-            {
+            if (isMapLoad(zone)) {
                 const QString folder = zone.left(zone.length() - 5); // remove "_load"
                 if (tryMoveFile(folder, zone, ".ff"))
                     return true;
@@ -178,24 +206,14 @@ namespace Funcs
 
         bool zoneExistsOnDisk(const QString& zone)
         {
-            // check if zone has it
-            QDir zoneDir(Globals.pathH1 + "/zone");
-            QStringList matchingFiles = zoneDir.entryList(QStringList{ zone + ".ff" },
-                                                          QDir::Files | QDir::NoSymLinks | QDir::NoDotAndDotDot,
-                                                          QDir::Name | QDir::IgnoreCase);
-
-            if (!matchingFiles.isEmpty())
-            {
-                return true;
+            QDir zoneDir(Globals.pathH1 + "/zone/");
+            if (!zoneDir.exists()) {
+                return false;
             }
 
-            // check all subdirectories in zone
-            const auto subDirs = zoneDir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot);
-            for (const QFileInfo& subDir : subDirs)
-            {
-                QDir sub(subDir.absoluteFilePath());
-                if (sub.exists(zone + ".ff"))
-                {
+            for (const QString& lang : languageFolders) {
+                QDir langDir(zoneDir.filePath(lang));
+                if (langDir.exists() && QFile::exists(langDir.filePath(zone + ".ff"))) {
                     return true;
                 }
             }
@@ -347,7 +365,7 @@ void H1ModTools::setupListWidgets()
 
             auto is_map_source = Funcs::IW3::isMapSource(raw_name.fileName());
 
-            updateExportButtonStates(true, is_map_source);
+            updateExportButtonStates(true, false);
             updateMapButtonStates(true, !is_map_source);
         }
     });
@@ -401,11 +419,6 @@ void H1ModTools::populateListH1(QTreeWidget* tree, const QString& path)
 void H1ModTools::populateListIW(QTreeWidget* tree, const QString& path)
 {
     tree->clear();
-
-    const QStringList languageFolders = {
-        "english", "french", "german", "spanish",
-        "japanese", "russian", "italian", "dlc"
-    };
 
     // zone/{language}
     QDir zoneBaseDir(path + "/zone");
@@ -565,7 +578,7 @@ void H1ModTools::on_buildAndExportButton_clicked()
 
 void H1ModTools::on_exportButton_clicked()
 {
-    export_map();
+    exportSelection();
 }
 
 void H1ModTools::on_buildZoneButton_clicked()
@@ -843,7 +856,7 @@ void H1ModTools::onTreeContextMenuRequested(const QPoint& pos)
 }
 
 // export
-void H1ModTools::export_map()
+void H1ModTools::exportSelection()
 {
     const auto gameType = getCurrentGameType();
     
@@ -859,19 +872,8 @@ void H1ModTools::export_map()
         }
     };
 
-    static const auto getGamePath = [gameType]() -> QString {
-        switch (gameType) {
-        case IW3: return Globals.pathIW3;
-        case IW4: return Globals.pathIW4;
-        case IW5: return Globals.pathIW5;
-        default:
-            __debugbreak();
-            return "";
-        }
-    };
-
     const QString executable = getExecutableName();
-    const QString pathStr = getGamePath() + "/" + executable;
+    const QString pathStr = Funcs::Shared::getGamePath(gameType) + "/" + executable;
     QFileInfo file(pathStr);
 
     if (!file.exists() || !file.isExecutable()) {
@@ -897,6 +899,14 @@ void H1ModTools::export_map()
     const QString currentSelectedPath = widget->currentItem()->data(0, Qt::UserRole).toString();
     const bool isUserMap = currentSelectedPath.contains("usermaps");
 
+    // Add a check for map source exporting
+    if (gameType == GameType::IW3 && Funcs::IW3::isMapSource(QFileInfo(currentSelectedText).fileName())) {
+        if (!Funcs::Shared::zoneExistsForDump(QFileInfo(currentSelectedText).completeBaseName(), gameType)) {
+            qWarning() << "Map source not built yet for" << currentSelectedText;
+            return;
+        }
+    }
+
     if (isUserMap)
         qInfo() << "Exporting map" << currentSelectedText;
     else
@@ -913,7 +923,10 @@ void H1ModTools::export_map()
                 treeWidgetH1->scrollToItem(treeWidgetH1->currentItem(), QAbstractItemView::PositionAtCenter);
                 treeWidgetH1->setFocus();
             }
-            updateVisibility();
+            else
+            {
+                ui.tabWidget->setCurrentWidget(ui.tabIW3);
+            }
         }
 	};
 
@@ -946,7 +959,7 @@ void H1ModTools::export_map()
                 return;
             }
 
-            const QString dumpFolder = getGamePath() + "/dump/" + zone;
+            const QString dumpFolder = Funcs::Shared::getGamePath(gameType) + "/dump/" + zone;
             const QString destFolder = Globals.pathH1 + "/zonetool/" + zone;
             QtUtils::moveDirectory(dumpFolder, destFolder);
 

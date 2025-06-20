@@ -53,7 +53,7 @@ private:
     QTreeWidget* treeWidgetIW4 = nullptr;
     QTreeWidget* treeWidgetIW5 = nullptr;
 
-    void export_map();
+    void exportSelection();
     
     void buildIW3MapFastfile(const QString& mapName, const QString& cod4Dir);
     void compileIW3MapReflections(const QString& mapName, const QString& cod4Dir);
