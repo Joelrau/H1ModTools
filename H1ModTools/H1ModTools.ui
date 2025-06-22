@@ -48,7 +48,7 @@
       <widget class="QWidget" name="tabH1">
        <attribute name="icon">
         <iconset resource="H1ModTools.qrc">
-         <normaloff>:/H1ModTools/Resources/h1_icon.png</normaloff>:/H1ModTools/Resources/h1_icon.png</iconset>
+         <normaloff>:/H1ModTools/Resources/Icons/h1_icon.png</normaloff>:/H1ModTools/Resources/Icons/h1_icon.png</iconset>
        </attribute>
        <attribute name="title">
         <string>H1</string>
@@ -57,7 +57,7 @@
       <widget class="QWidget" name="tabIW3">
        <attribute name="icon">
         <iconset resource="H1ModTools.qrc">
-         <normaloff>:/H1ModTools/Resources/iw3_icon.png</normaloff>:/H1ModTools/Resources/iw3_icon.png</iconset>
+         <normaloff>:/H1ModTools/Resources/Icons/iw3_icon.png</normaloff>:/H1ModTools/Resources/Icons/iw3_icon.png</iconset>
        </attribute>
        <attribute name="title">
         <string>IW3</string>
@@ -66,7 +66,7 @@
       <widget class="QWidget" name="tabIW4">
        <attribute name="icon">
         <iconset resource="H1ModTools.qrc">
-         <normaloff>:/H1ModTools/Resources/iw4_icon.png</normaloff>:/H1ModTools/Resources/iw4_icon.png</iconset>
+         <normaloff>:/H1ModTools/Resources/Icons/iw4_icon.png</normaloff>:/H1ModTools/Resources/Icons/iw4_icon.png</iconset>
        </attribute>
        <attribute name="title">
         <string>IW4</string>
@@ -75,7 +75,7 @@
       <widget class="QWidget" name="tabIW5">
        <attribute name="icon">
         <iconset resource="H1ModTools.qrc">
-         <normaloff>:/H1ModTools/Resources/iw5_icon.png</normaloff>:/H1ModTools/Resources/iw5_icon.png</iconset>
+         <normaloff>:/H1ModTools/Resources/Icons/iw5_icon.png</normaloff>:/H1ModTools/Resources/Icons/iw5_icon.png</iconset>
        </attribute>
        <attribute name="title">
         <string>IW5</string>
@@ -133,7 +133,7 @@
          </property>
          <property name="icon">
           <iconset resource="H1ModTools.qrc">
-           <normaloff>:/H1ModTools/Resources/h1_icon.png</normaloff>:/H1ModTools/Resources/h1_icon.png</iconset>
+           <normaloff>:/H1ModTools/Resources/Icons/h1_icon.png</normaloff>:/H1ModTools/Resources/Icons/h1_icon.png</iconset>
          </property>
          <property name="iconSize">
           <size>

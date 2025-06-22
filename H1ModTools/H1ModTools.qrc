@@ -1,9 +1,9 @@
 <RCC>
     <qresource prefix="/H1ModTools">
-        <file>Resources/iw3_icon.png</file>
-        <file>Resources/iw4_icon.png</file>
-        <file>Resources/iw5_icon.png</file>
-        <file>Resources/h1_icon.png</file>
-        <file>Styles/main.qss</file>
+        <file>Resources/Icons/iw3_icon.png</file>
+        <file>Resources/Icons/iw4_icon.png</file>
+        <file>Resources/Icons/iw5_icon.png</file>
+        <file>Resources/Icons/h1_icon.png</file>
+        <file>Resources/Styles/main.qss</file>
     </qresource>
 </RCC>

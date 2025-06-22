@@ -4,7 +4,7 @@
 
 void setupStyle()
 {
-    QFile file(":/H1ModTools/Styles/main.qss");
+    QFile file(":/H1ModTools/Resources/Styles/main.qss");
     if (!file.open(QFile::ReadOnly | QFile::Text)) {
         qWarning() << "Failed to open stylesheet resource";
 
