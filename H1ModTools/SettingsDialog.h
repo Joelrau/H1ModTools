@@ -1,6 +1,8 @@
 #pragma once
 #include "Globals.h"
 
+void setupStyle();
+
 namespace Ui {
     class SettingsDialog;
 }
@@ -14,6 +16,9 @@ public:
 
 private:
     void loadSettings();
+    void handleDialogRejected();
+    void handleDialogAccepted();
+    QVariant savedThemeValue;
 
 private slots:
     void on_buttonBox_accepted();
@@ -23,6 +28,8 @@ private slots:
     void on_buttonBrowseIW3_clicked();
     void on_buttonBrowseIW4_clicked();
     void on_buttonBrowseIW5_clicked();
+
+    void on_AuroraThemeCheckBox_clicked();
 
 private:
     Ui::SettingsDialog* ui;

@@ -1,11 +1,46 @@
 ﻿#include "SettingsDialog.h"
 #include "ui_SettingsDialog.h"
 
+void setupStyle()
+{
+    QSettings settings;
+    auto mTreyarchTheme = settings.value("UseAuroraTheme", true).toBool();
+
+    if (mTreyarchTheme)
+    {
+        QFile file(":/H1ModTools/Resources/Styles/main.qss");
+        if (!file.open(QFile::ReadOnly | QFile::Text)) {
+            qWarning() << "Failed to open stylesheet resource";
+
+            QApplication::setStyle(QStyleFactory::create("Fusion"));
+        }
+        else
+        {
+            QString styleSheet = QString::fromUtf8(file.readAll());
+            qApp->setStyleSheet(styleSheet);
+        }
+    }
+    else
+    {
+        qApp->setStyle("Windows");
+        qApp->setStyleSheet("");
+    }
+}
+
 SettingsDialog::SettingsDialog(QWidget* parent) :
     QDialog(parent),
     ui(new Ui::SettingsDialog)
 {
+    QSettings settings;
+    savedThemeValue = settings.value("UseAuroraTheme", true);
+
     ui->setupUi(this);
+
+    ui->AuroraThemeCheckBox->setChecked(savedThemeValue.toBool());
+
+    connect(this, &QDialog::rejected, this, &SettingsDialog::handleDialogRejected);
+    connect(this, &QDialog::accepted, this, &SettingsDialog::handleDialogAccepted);
+
     loadSettings();
 }
 
@@ -14,16 +49,15 @@ SettingsDialog::~SettingsDialog()
     delete ui;
 }
 
-void SettingsDialog::loadSettings()
+void SettingsDialog::handleDialogRejected()
 {
-    ui->lineEditH1->setText(Globals.pathH1);
-    ui->lineEditIW3->setText(Globals.pathIW3);
-    ui->lineEditIW4->setText(Globals.pathIW4);
-    ui->lineEditIW5->setText(Globals.pathIW5);
-    ui->lineEditH1exe->setText(Globals.h1Executable);
+    QSettings settings;
+    settings.setValue("UseAuroraTheme", savedThemeValue.toBool());
+    setupStyle();
 }
 
-void SettingsDialog::on_buttonBox_accepted() {
+void SettingsDialog::handleDialogAccepted()
+{
     // Collect path values
     QString h1Path = ui->lineEditH1->text().trimmed();
     QString iw3Path = ui->lineEditIW3->text().trimmed();
@@ -57,7 +91,19 @@ void SettingsDialog::on_buttonBox_accepted() {
     Globals.h1Executable = h1Executable;
 
     saveGlobalsToJson(this);
+}
 
+void SettingsDialog::loadSettings()
+{
+    ui->lineEditH1->setText(Globals.pathH1);
+    ui->lineEditIW3->setText(Globals.pathIW3);
+    ui->lineEditIW4->setText(Globals.pathIW4);
+    ui->lineEditIW5->setText(Globals.pathIW5);
+    ui->lineEditH1exe->setText(Globals.h1Executable);
+}
+
+void SettingsDialog::on_buttonBox_accepted()
+{
     accept();
 }
 
@@ -88,4 +134,11 @@ void SettingsDialog::on_buttonBrowseIW5_clicked()
 {
     QString dir = QFileDialog::getExistingDirectory(this, "Select Call of Duty - Modern Warfare 3 (IW5) Directory");
     if (!dir.isEmpty()) ui->lineEditIW5->setText(dir);
+}
+
+void SettingsDialog::on_AuroraThemeCheckBox_clicked()
+{
+    QSettings settings;
+    settings.setValue("UseAuroraTheme", ui->AuroraThemeCheckBox->isChecked());
+    setupStyle();
 }

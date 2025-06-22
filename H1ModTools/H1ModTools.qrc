@@ -5,5 +5,7 @@
         <file>Resources/Icons/iw5_icon.png</file>
         <file>Resources/Icons/h1_icon.png</file>
         <file>Resources/Styles/main.qss</file>
+        <file>Resources/Images/checkbox.png</file>
+        <file>Resources/Images/down_arrow.png</file>
     </qresource>
 </RCC>

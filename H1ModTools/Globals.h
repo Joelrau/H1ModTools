@@ -1,24 +1,6 @@
 #pragma once
 
-#include <QStyleFactory>
-#include <QString>
-#include <QProcess>
-#include <QObject>
-#include <QTextEdit>
-#include <QSocketNotifier>
-#include <QStorageInfo>
-#include <QDir>
-#include <QDialog>
-#include <QFile>
-#include <QFileDialog>
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QMessageBox>
-#include <QListWidget>
-#include <QTreeWidget>
-#include <QMenu>
-#include <QDesktopServices>
-#include <QProgressDialog>
+#include <QtWidgets/QtWidgets>
 
 #include "QTUtils.h"
 

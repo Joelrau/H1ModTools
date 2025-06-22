@@ -2,21 +2,6 @@
 
 #include "SettingsDialog.h"
 
-void setupStyle()
-{
-    QFile file(":/H1ModTools/Resources/Styles/main.qss");
-    if (!file.open(QFile::ReadOnly | QFile::Text)) {
-        qWarning() << "Failed to open stylesheet resource";
-
-        QApplication::setStyle(QStyleFactory::create("Fusion"));
-    }
-    else
-    {
-        QString styleSheet = QString::fromUtf8(file.readAll());
-        qApp->setStyleSheet(styleSheet);
-    }
-}
-
 const QStringList languageFolders = {
         "english", "french", "german", "spanish",
         "japanese", "russian", "italian", "dlc"
