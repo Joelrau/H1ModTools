@@ -7,6 +7,8 @@
 
 namespace QtUtils {
 
+    // === Directory Functions ===
+
     bool copyDirectory(const QString& sourcePath, const QString& destinationPath)
     {
         QDir sourceDir(sourcePath);
@@ -29,7 +31,6 @@ namespace QtUtils {
             QString destFilePath = destinationPath + QDir::separator() + entry.fileName();
 
             if (entry.isDir()) {
-                // Recurse into existing or new directory
                 if (!copyDirectory(srcFilePath, destFilePath)) {
                     return false;
                 }
@@ -55,7 +56,7 @@ namespace QtUtils {
     {
         QDir dir(dirPath);
         if (!dir.exists())
-            return true; // Nothing to delete
+            return true;
 
         QFileInfoList entries = dir.entryInfoList(QDir::NoDotAndDotDot | QDir::AllEntries);
         for (const QFileInfo& entry : entries) {
@@ -63,7 +64,7 @@ namespace QtUtils {
                 if (!deleteDirectory(entry.filePath())) {
                     qWarning() << "[QtUtils] Failed to remove directory:" << entry.filePath();
                     return false;
-                }  
+                }
             }
             else {
                 if (!QFile::remove(entry.filePath())) {
@@ -82,6 +83,62 @@ namespace QtUtils {
             return false;
         }
         return deleteDirectory(sourcePath);
+    }
+
+    // === File Functions ===
+
+    bool copyFile(const QString& sourceFile, const QString& destinationFile)
+    {
+        if (!QFile::exists(sourceFile)) {
+            qWarning() << "[QtUtils] Source file does not exist:" << sourceFile;
+            return false;
+        }
+
+        QFileInfo destInfo(destinationFile);
+        QDir destDir = destInfo.dir();
+
+        if (!destDir.exists()) {
+            if (!destDir.mkpath(".")) {
+                qWarning() << "[QtUtils] Failed to create destination directory:" << destDir.absolutePath();
+                return false;
+            }
+        }
+
+        if (QFile::exists(destinationFile)) {
+            if (!QFile::remove(destinationFile)) {
+                qWarning() << "[QtUtils] Failed to remove existing destination file:" << destinationFile;
+                return false;
+            }
+        }
+
+        if (!QFile::copy(sourceFile, destinationFile)) {
+            qWarning() << "[QtUtils] Failed to copy file:" << sourceFile << "to" << destinationFile;
+            return false;
+        }
+
+        return true;
+    }
+
+    bool deleteFile(const QString& filePath)
+    {
+        if (!QFile::exists(filePath))
+            return true; // Nothing to delete
+
+        if (!QFile::remove(filePath)) {
+            qWarning() << "[QtUtils] Failed to delete file:" << filePath;
+            return false;
+        }
+
+        return true;
+    }
+
+    bool moveFile(const QString& sourceFile, const QString& destinationFile)
+    {
+        if (!copyFile(sourceFile, destinationFile)) {
+            return false;
+        }
+
+        return deleteFile(sourceFile);
     }
 
 } // namespace QtUtils

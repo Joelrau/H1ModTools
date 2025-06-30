@@ -4,28 +4,25 @@
 
 namespace QtUtils {
 
-	/**
-	 * @brief Moves a directory from sourcePath to destinationPath.
-	 *        Recursively copies contents and deletes the original folder.
-	 * @param sourcePath The full path of the directory to move.
-	 * @param destinationPath The destination directory path.
-	 * @return True if successful, false otherwise.
-	 */
-	bool moveDirectory(const QString& sourcePath, const QString& destinationPath);
+    // === Directory Operations ===
 
-	/**
-	 * @brief Recursively copies a directory and its contents.
-	 * @param sourcePath The source directory to copy.
-	 * @param destinationPath The destination directory path.
-	 * @return True if successful, false otherwise.
-	 */
-	bool copyDirectory(const QString& sourcePath, const QString& destinationPath);
+    // Recursively copies a directory and its contents.
+    bool copyDirectory(const QString& sourcePath, const QString& destinationPath);
 
-	/**
-	 * @brief Recursively deletes a directory and all its contents.
-	 * @param dirPath The path of the directory to delete.
-	 * @return True if successful, false otherwise.
-	 */
-	bool deleteDirectory(const QString& dirPath);
+    // Recursively deletes a directory and its contents.
+    bool deleteDirectory(const QString& dirPath);
 
+    // Moves a directory by copying then deleting the source.
+    bool moveDirectory(const QString& sourcePath, const QString& destinationPath);
+
+    // === File Operations ===
+
+    // Copies a single file, replacing the destination if it exists.
+    bool copyFile(const QString& sourceFile, const QString& destinationFile);
+
+    // Deletes a single file.
+    bool deleteFile(const QString& filePath);
+
+    // Moves a single file by copying then deleting the source.
+    bool moveFile(const QString& sourceFile, const QString& destinationFile);
 }

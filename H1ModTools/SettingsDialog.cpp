@@ -4,9 +4,9 @@
 void setupStyle()
 {
     QSettings settings;
-    auto mTreyarchTheme = settings.value("UseAuroraTheme", true).toBool();
+    auto auroraTheme = settings.value("UseAuroraTheme", true).toBool();
 
-    if (mTreyarchTheme)
+    if (auroraTheme)
     {
         QFile file(":/H1ModTools/Resources/Styles/main.qss");
         if (!file.open(QFile::ReadOnly | QFile::Text)) {

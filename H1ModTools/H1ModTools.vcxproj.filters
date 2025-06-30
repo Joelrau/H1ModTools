@@ -52,9 +52,18 @@
     <ClCompile Include="QTUtils.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="COD4ModTools.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GSC.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <QtUic Include="SettingsDialog.ui">
+      <Filter>Form Files</Filter>
+    </QtUic>
+    <QtUic Include="COD4ModTools.ui">
       <Filter>Form Files</Filter>
     </QtUic>
   </ItemGroup>
@@ -65,12 +74,18 @@
     <QtMoc Include="LogRedirector.h">
       <Filter>Header Files</Filter>
     </QtMoc>
+    <QtMoc Include="COD4ModTools.h">
+      <Filter>Header Files</Filter>
+    </QtMoc>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Globals.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="QTUtils.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="GSC.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

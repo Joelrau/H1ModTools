@@ -2,6 +2,8 @@
 
 #include "SettingsDialog.h"
 
+#include "GSC.h"
+
 const QStringList languageFolders = {
         "english", "french", "german", "spanish",
         "japanese", "russian", "italian", "dlc"
@@ -11,6 +13,38 @@ namespace Funcs
 {
     namespace Shared
     {
+        bool replaceStringInFile(const QString& filePath, const QString& target, const QString& replacement)
+        {
+            QFile file(filePath);
+
+            if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+                qWarning() << "Failed to open file for reading:" << filePath;
+                return false;
+            }
+
+            QTextStream in(&file);
+            QString content = in.readAll();
+            file.close();
+
+            if (!content.contains(target)) {
+                qDebug() << "Target string not found in file.";
+                return false;
+            }
+
+            content.replace(target, replacement, Qt::CaseSensitive);
+
+            if (!file.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate)) {
+                qWarning() << "Failed to open file for writing:" << filePath;
+                return false;
+            }
+
+            QTextStream out(&file);
+            out << content;
+            file.close();
+
+            return true;
+        }
+
         static QString getGamePath(GameType gameType)
         {
             switch (gameType) {
@@ -86,6 +120,16 @@ namespace Funcs
         bool isMapLoad(const QString& name)
         {
             return name.endsWith("_load");
+        }
+
+        bool isMpMap(const QString& name)
+        {
+            const QDir baseDir = QDir(Globals.pathH1).filePath("zonetool/" + name);
+            if (!baseDir.exists())
+                return false;
+
+			const QString mpPath = baseDir.filePath(QStringLiteral("maps/mp/%1.d3dbsp.ents").arg(name));
+			return QFileInfo::exists(mpPath);
         }
 
         bool isMap(const QString& name)
@@ -336,6 +380,7 @@ void H1ModTools::setupListWidgets()
             const bool isMap = Funcs::H1::isMap(name);
             ui.compileReflectionsButton->setEnabled(isMap);
             ui.runMapButton->setEnabled(isMap);
+			ui.mapRunCmdsText->setEnabled(isMap);
             ui.cheatsCheckBox->setEnabled(isMap);
             ui.developerCheckBox->setEnabled(isMap);
         }
@@ -492,6 +537,7 @@ void H1ModTools::updateVisibility()
     ui.buildZoneButton->setVisible(canCompile);
     ui.compileReflectionsButton->setVisible(canCompile);
     ui.runMapButton->setVisible(canCompile);
+	ui.mapRunCmdsText->setVisible(canCompile);
     ui.cheatsCheckBox->setVisible(canCompile);
     ui.developerCheckBox->setVisible(canCompile);
 
@@ -669,8 +715,18 @@ void H1ModTools::on_compileReflectionsButton_clicked()
     QStringList arguments;
     arguments << "-multiplayer"
         << "+set" << "r_reflectionProbeGenerate" << "1"
-        << "+set" << "r_reflectionProbeGenerateExit" << "1"
-        << "+map" << currentSelectedZone;
+        << "+set" << "r_reflectionProbeGenerateExit" << "1";
+
+    if (ui.mapRunCmdsText) {
+        const QStringList cmds = ui.mapRunCmdsText->toPlainText().split(' ', Qt::SkipEmptyParts);
+        for (const QString& cmd : cmds) {
+            if (!cmd.trimmed().isEmpty()) {
+                arguments << cmd.trimmed();
+            }
+        }
+    }
+    
+    arguments << "+map" << currentSelectedZone;
 
     qDebug() << "Generating reflection probes for zone" << currentSelectedZone;
 
@@ -750,6 +806,16 @@ void H1ModTools::on_runMapButton_clicked()
         arguments << "+set" << "developer" << "1";
         arguments << "+set" << "developer_script" << "1";
     }
+
+    if (ui.mapRunCmdsText) {
+        const QStringList cmds = ui.mapRunCmdsText->toPlainText().split(' ', Qt::SkipEmptyParts);
+        for (const QString& cmd : cmds) {
+            if (!cmd.trimmed().isEmpty()) {
+                arguments << cmd.trimmed();
+            }
+        }
+    }
+
     arguments << (ui.cheatsCheckBox->isChecked() ? "+devmap" : "+map") << currentSelectedZone;
 
     qDebug() << "Launching map" << currentSelectedZone;
@@ -949,7 +1015,41 @@ void H1ModTools::exportSelection()
             QtUtils::moveDirectory(dumpFolder, destFolder);
 
             if (ui.convertGscCheckBox->isChecked()) {
-                // fixup GSC...
+				CopyGSCFiles(destFolder); // Copy default GSC files to the zone folder
+				ConvertGSCFiles(destFolder); // Convert GSC files to H1 format
+                
+                // Copy template files here, maybe need to change this later
+				const auto isMap = Funcs::H1::isMap(zone);
+                if (isMap)
+                {
+                    const auto isMpMap = Funcs::H1::isMpMap(zone);
+
+                    const auto addTemplateFile = [zone](const QString& templatePath, const QString& destFolder, const QString& destFile)
+                    {
+                        if (!QFile::exists(destFolder + destFile)) {
+                            QtUtils::copyFile(templatePath, destFolder + destFile);
+                            QFile::rename(destFolder + QFile(templatePath).fileName(), destFolder + destFile);
+
+							Funcs::Shared::replaceStringInFile(destFolder + destFile, "mapname", zone);
+
+                            return true;
+                        }
+                        return false;
+                    };
+
+                    addTemplateFile("static/templates/vision.vision", destFolder + "/vision/", zone + ".vision");
+                    addTemplateFile("static/templates/_art.gsc", destFolder + "/maps/createart/", zone + "_art.gsc");
+                    addTemplateFile("static/templates/_fog.gsc", destFolder + "/maps/createart/", zone + "_fog.gsc");
+                    addTemplateFile("static/templates/_fog_hdr.gsc", destFolder + "/maps/createart/", zone + "_fog_hdr.gsc");
+                    addTemplateFile("static/templates/_lightsets.csv", destFolder + "/maps/createart/", zone + "_lightsets.csv");
+                    addTemplateFile("static/templates/_lightsets_hdr.csv", destFolder + "/maps/createart/", zone + "_lightsets_hdr.csv");
+
+                    if (!isMpMap)
+                    {
+                        Funcs::Shared::replaceStringInFile(destFolder + "/maps/createart/" + zone + "_fog.gsc", "maps\\mp\\_art::create_vision_set_fog", "maps\\_utility::create_vision_set_fog");
+                        Funcs::Shared::replaceStringInFile(destFolder + "/maps/createart/" + zone + "_fog_hdr.gsc", "maps\\mp\\_art::create_vision_set_fog", "maps\\_utility::create_vision_set_fog");
+                    }
+                }
             }
 
             if (ui.generateCsvCheckBox->isChecked()) {
@@ -973,9 +1073,12 @@ void H1ModTools::exportSelection()
     if (!isUserMap) {
         const QString zone = QFileInfo(currentSelectedText).completeBaseName();
         dumpZone(zone, true);
+        // dump map load too...
+        // dump iwd sound & images
     }
     else {
-        // TODO: Handle usermap export logic
+        const QString zone = QFileInfo(currentSelectedText).completeBaseName();
+        dumpZone(zone, true);
     }
 }
 
@@ -1287,6 +1390,7 @@ void H1ModTools::disableUiAndStoreState() {
         ui.exportButton,
         ui.compileReflectionsButton,
         ui.runMapButton,
+        ui.mapRunCmdsText,
         ui.settingsButton,
         ui.tabWidget,
         ui.cheatsCheckBox,

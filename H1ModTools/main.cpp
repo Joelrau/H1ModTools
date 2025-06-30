@@ -1,4 +1,5 @@
 #include "H1ModTools.h"
+#include "COD4ModTools.h"
 
 #include <QApplication>
 
