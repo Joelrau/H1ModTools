@@ -25,4 +25,7 @@ namespace QtUtils {
 
     // Moves a single file by copying then deleting the source.
     bool moveFile(const QString& sourceFile, const QString& destinationFile);
+
+    // Reads a file
+    QString readFile(const QString& path);
 }

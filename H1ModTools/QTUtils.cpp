@@ -141,4 +141,17 @@ namespace QtUtils {
         return deleteFile(sourceFile);
     }
 
+    QString readFile(const QString& path)
+    {
+        QFile file(path);
+        if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            qDebug() << "Failed to open file for reading:" << path;
+            return{};
+        }
+        QTextStream in(&file);
+        QString content = in.readAll();
+        file.close();
+        return content;
+    }
+
 } // namespace QtUtils

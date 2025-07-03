@@ -220,9 +220,9 @@ namespace Funcs
             }
 
             // Delete any matching .h1Image files
-            const QStringList h1ImageFiles = sourceDir.entryList(QStringList() << "_reflection_probe*.h1Image", QDir::Files);
+            const QStringList h1ImageFiles = targetDir.entryList(QStringList() << "_reflection_probe*.h1Image", QDir::Files);
             for (const QString& fileName : h1ImageFiles) {
-                const QString filePath = sourceFolder + fileName;
+                const QString filePath = targetFolder + fileName;
 
                 if (!QFile::remove(filePath)) {
                     qWarning() << "Failed to delete file:" << filePath;
@@ -906,6 +906,590 @@ void H1ModTools::onTreeContextMenuRequested(const QPoint& pos)
 #endif
 }
 
+class MapEnts
+{
+public:
+    MapEnts(const QString& mapEntsPath)
+    {
+        path = mapEntsPath;
+    }
+
+    ~MapEnts()
+    {
+        path.clear();
+    }
+
+    QString path;
+
+    struct MapEntVar
+    {
+        QString key;
+        QString value;
+    };
+
+    class MapEntity
+    {
+    public:
+        void clear() {
+            vars.clear();
+        }
+        void add_var(const MapEntVar& var)
+        {
+            vars.append(var);
+        }
+
+        QString get(const QString& key) const
+        {
+            for (const auto& var : this->vars)
+            {
+                if (var.key == key)
+                {
+                    return var.value;
+                }
+            }
+
+            return "";
+        }
+
+    private:
+        QList<MapEntVar> vars;
+    };
+
+    QList<MapEntity> ents;
+
+    void readVars()
+    {
+        QFile file(this->path);
+        if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            qWarning() << "Failed to open file:" << this->path;
+            return;
+        }
+
+        QTextStream in(&file);
+        QString line;
+        unsigned int lineNum = 0;
+        bool inBlock = false;
+
+        MapEntity entity{};
+
+        while (!in.atEnd()) {
+            line = in.readLine().trimmed();
+            lineNum++;
+
+            if (line.startsWith("//")) {
+                continue;
+            }
+
+            if (line[0] == "{") {
+                inBlock = true;
+            }
+            else if (line[0] == "}") {
+                ents.append(entity);
+                entity.clear();
+                inBlock = false;
+            }
+            else if (inBlock) {
+                QRegularExpression expr("^\"([^\"]+)\"\\s+\"([^\"]+)\"$");
+                QRegularExpressionMatch match = expr.match(line);
+
+                if (!match.hasMatch()) {
+                    qWarning().noquote() << QString("Failed to parse line %1 (%2)").arg(lineNum).arg(line);
+                    continue;
+                }
+
+                MapEntVar var{};
+                var.key = match.captured(1).toLower();
+                var.value = match.captured(2);
+                entity.add_var(var);
+            }
+        }
+    }
+};
+
+class MapEntsReader
+{
+public:
+    struct DestructibleData
+    {
+        QString name;   // destructible_type
+        QString model;
+
+        bool operator==(const DestructibleData& other) const {
+            return name == other.name && model == other.model;
+        }
+    };
+
+    struct AnimatedModelData
+    {
+        QString precacheScript;
+        QString model;
+
+        bool operator==(const AnimatedModelData& other) const {
+            return precacheScript == other.precacheScript && model == other.model;
+        }
+    };
+
+    MapEntsReader(const QString& mapEntsPath)
+    {
+        auto mapEnts = MapEnts(mapEntsPath);
+        mapEnts.readVars();
+
+        if (mapEnts.ents.isEmpty()) {
+            return;
+        }
+
+        destructibles.clear();
+        animatedModels.clear();
+
+        auto ents = mapEnts.ents;
+        for(auto& ent : ents)
+        {
+            auto targetname = ent.get("targetname");
+            auto classname = ent.get("classname");
+            auto model = ent.get("model");
+
+            if (!model.isEmpty() && classname == "script_model")
+                models.append(model);
+
+            auto destructible_type = ent.get("destructible_type");
+            if (!destructible_type.isEmpty()) {
+                DestructibleData data{};
+                data.name = destructible_type;
+                data.model = model;
+                destructibles.insert(data);
+            }
+            
+            if (!targetname.isEmpty() && targetname == "animated_model") {
+                AnimatedModelData data{};
+                data.model = model;
+                data.precacheScript = ent.get("precache_script");
+                animatedModels.insert(data);
+            }
+        }
+
+        models.sort();
+        models.removeDuplicates();
+    }
+
+    ~MapEntsReader()
+    {
+        destructibles.clear();
+        animatedModels.clear();
+        models.clear();
+    }
+
+    QSet<DestructibleData> getDestructibles() const { return destructibles; }
+    QSet<AnimatedModelData> getAnimatedModels() const { return animatedModels; }
+    QStringList getAllModels() const { return models; }
+
+private:
+    QSet<DestructibleData> destructibles;
+    QSet<AnimatedModelData> animatedModels;
+    QStringList models;
+};
+
+// Hash functions for QSet usage
+inline size_t qHash(const MapEntsReader::DestructibleData& key, uint seed = 0)
+{
+    return qHash(key.name, seed) ^ qHash(key.model, seed << 1);
+}
+
+inline size_t qHash(const MapEntsReader::AnimatedModelData& key, uint seed = 0)
+{
+    return qHash(key.precacheScript, seed << 1)
+        ^ qHash(key.model, seed << 2);
+}
+
+QSet<QString> parseCreateFxGsc(const QString& data)
+{
+    QSet<QString> sounds;
+
+    // Correctly escaped string:
+    QRegularExpression regex("\\w+\\.v\\[\\s*\"soundalias\"\\s*\\]\\s*=\\s*\"([\\w\\s]+?)\"",
+        QRegularExpression::CaseInsensitiveOption);
+
+    QRegularExpressionMatchIterator it = regex.globalMatch(data);
+    while (it.hasNext())
+    {
+        QRegularExpressionMatch match = it.next();
+        sounds.insert(match.captured(1));
+    }
+
+    return sounds;
+}
+
+QSet<QString> parseFxGsc(const QString& data)
+{
+    QSet<QString> effects;
+
+    QRegularExpression regex("loadfx\\s*\\(\\s*\"([^\"]+)\"\\s*\\);",
+        QRegularExpression::CaseInsensitiveOption);
+
+    QRegularExpressionMatchIterator it = regex.globalMatch(data);
+    while (it.hasNext())
+    {
+        QRegularExpressionMatch match = it.next();
+        effects.insert(match.captured(1));
+    }
+
+    return effects;
+}
+
+QMap<QString, QString> parseAnimatedModelScript(const QString& scriptText)
+{
+    QMap<QString, QString> result;
+    QMap<QString, QString> variableMap;      // varName -> "modelName"
+
+    // Match: variableName = "modelName";
+    QRegularExpression varAssignRegex("\\b([a-zA-Z_][a-zA-Z0-9_]*)\\s*=\\s*\"([^\"]+)\"");
+    QRegularExpressionMatchIterator varIter = varAssignRegex.globalMatch(scriptText);
+    while (varIter.hasNext())
+    {
+        QRegularExpressionMatch match = varIter.next();
+        variableMap.insert(match.captured(1), match.captured(2));
+    }
+
+    // Match: level.anim_prop_models[variableName]["..."] = "variation";
+    QRegularExpression animPropUseRegex("level\\.anim_prop_models\\[\\s*([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\]\\s*\\[\\s*\"[^\"]+\"\\s*\\]\\s*=\\s*\"([^\"]+)\"");
+    QRegularExpressionMatchIterator useIter = animPropUseRegex.globalMatch(scriptText);
+    while (useIter.hasNext())
+    {
+        QRegularExpressionMatch match = useIter.next();
+        QString varName = match.captured(1);
+        QString variation = match.captured(2);
+
+        if (variableMap.contains(varName))
+        {
+            QString modelName = variableMap.value(varName);
+            result.insert(modelName, variation);
+        }
+    }
+
+    return result;
+}
+
+void generateCSV(const QString& zone, const QString& destFolder, const bool isMpMap, GameType gameType)
+{
+    if (!Funcs::H1::isMap(zone) && !Funcs::H1::isMapLoad(zone)) {
+        qInfo() << "Could not generate csv for zone" << zone << "since it's not map/map load";
+        return;
+    }
+
+    const auto rootDir = destFolder;
+
+    QString csvContent{};
+    const auto save = [&]()
+    {
+        const auto csvFilePath = Globals.pathH1 + "/zone_source/" + zone + ".csv";
+        QFile csvFile(csvFilePath);
+        if (csvFile.open(QFile::WriteOnly)) {
+            csvFile.write(csvContent.toUtf8().data());
+            csvFile.close();
+        }
+        else {
+            qWarning() << "Failed to open csv" << csvFilePath << "for read";
+        }
+    };
+
+    const QString map_prefix = isMpMap
+        ? "maps/mp"
+        : "maps";
+    const QString map_prefix_full = destFolder + "/" + map_prefix + "/";
+    const QString mapents_path = map_prefix_full + zone + ".d3dbsp.ents";
+
+    const auto add_str = [&](const QString& str)
+    {
+        csvContent.append(str);
+    };
+
+    const auto add_line = [&](const QString& line)
+    {
+        add_str(line);
+        add_str("\n");
+    };
+
+    const auto add_asset = [&](const QString& type, const QString& name)
+    {
+        qInfo() << "Adding" << type.toUtf8().data() << name.toUtf8().data();
+        add_line(QString("%1,%2").arg(type.data(), name.data()));
+    };
+
+    add_line("// Generated by H1ModTools\n");
+
+    // add assets path...
+    static const auto getAssetsPath = [gameType]() -> QString {
+        QString assetsFolder = "zonetool_assets/";
+        switch (gameType)
+        {
+        case IW3: return assetsFolder + "iw3";
+        case IW4: return assetsFolder + "iw4";
+        case IW5: return assetsFolder + "iw5";
+        default:
+            __debugbreak();
+            return "";
+        }
+    };
+    add_line(QString("addpath,%1\n").arg(getAssetsPath()));
+
+    if (Funcs::H1::isMapLoad(zone)) {
+        add_asset("techset", ",2d");
+        add_asset("material", ",$victorybackdrop");
+        add_asset("material", ",$defeatbackdrop");
+        add_asset("material", "$levelbriefing");
+        add_asset("material", "$levelbriefingcrossfade");
+
+        save();
+        return;
+    }
+
+    const auto map = zone;
+
+    if (isMpMap)
+    {
+        add_line("// netconststrings");
+        add_asset("netconststrings", QString("ncs_%1_level").arg("mdl"));
+        add_asset("netconststrings", QString("ncs_%1_level").arg("mat"));
+        add_asset("netconststrings", QString("ncs_%1_level").arg("rmb"));
+        add_asset("netconststrings", QString("ncs_%1_level").arg("veh"));
+        add_asset("netconststrings", QString("ncs_%1_level").arg("vfx"));
+        add_asset("netconststrings", QString("ncs_%1_level").arg("loc"));
+        add_asset("netconststrings", QString("ncs_%1_level").arg("snd"));
+        add_asset("netconststrings", QString("ncs_%1_level").arg("sbx"));
+        add_asset("netconststrings", QString("ncs_%1_level").arg("snl"));
+        add_asset("netconststrings", QString("ncs_%1_level").arg("shk"));
+        add_asset("netconststrings", QString("ncs_%1_level").arg("mnu"));
+        add_asset("netconststrings", QString("ncs_%1_level").arg("tag"));
+        add_asset("netconststrings", QString("ncs_%1_level").arg("hic"));
+        add_asset("netconststrings", QString("ncs_%1_level").arg("nps"));
+        add_asset("netconststrings", QString("ncs_%1_level").arg("mic"));
+        add_asset("netconststrings", QString("ncs_%1_level").arg("sel"));
+        add_asset("netconststrings", QString("ncs_%1_level").arg("wep"));
+        add_asset("netconststrings", QString("ncs_%1_level").arg("att"));
+        add_asset("netconststrings", QString("ncs_%1_level").arg("hnt"));
+        add_asset("netconststrings", QString("ncs_%1_level").arg("anm"));
+        add_asset("netconststrings", QString("ncs_%1_level").arg("fxt"));
+        add_asset("netconststrings", QString("ncs_%1_level").arg("acl"));
+        add_asset("netconststrings", QString("ncs_%1_level").arg("lui"));
+        add_asset("netconststrings", QString("ncs_%1_level").arg("lsr"));
+        add_line("");
+    }
+
+    auto mapEntsRead = MapEntsReader(isMpMap ?
+        QString("%1/zonetool/%2/maps/mp/%2.d3dbsp.ents").arg(Globals.pathH1, map) :
+        QString("%1/zonetool/%2/maps/%2.d3dbsp.ents").arg(Globals.pathH1, map));
+
+    auto models = mapEntsRead.getAllModels();
+    if (!models.isEmpty()) {
+        add_line("//models");
+        for (auto& model : models) {
+            add_asset("xmodel", model);
+        }
+        add_line("");
+    }
+
+    QString createFxName = QString("maps/createfx/%1_fx.gsc").arg(map);
+    QString createFxSoundsName = QString("maps/createfx/%1_sound.gsc").arg(map);
+
+    auto addSounds = [&](const QString& file) {
+        QString createFxPath = QString("%1/%2").arg(rootDir, file);
+
+        QFile f(createFxPath);
+        if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            return;
+        }
+
+        QTextStream in(&f);
+        QString data = in.readAll();
+
+        qDebug() << "Parsing createfx gsc...";
+
+        add_line("// sounds");
+        QSet<QString> sounds = parseCreateFxGsc(data);
+        for (const QString& sound : sounds) {
+            add_asset("sound", sound);
+        }
+        add_line("");
+    };
+
+    QString fxName = QString("%1/%2_fx.gsc").arg(map_prefix, map);
+    auto addEffects = [&]() {
+        QString fxPath = QString("%1/%2").arg(rootDir, fxName);
+
+        QFile f(fxPath);
+        if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            return;
+        }
+
+        QTextStream in(&f);
+        QString data = in.readAll();
+
+        qDebug() << "Parsing fx gsc...";
+
+        add_line("// effects");
+        QSet<QString> effects = parseFxGsc(data);
+        for (const QString& effect : effects) {
+            add_asset("fx", effect);
+        }
+        add_line("");
+    };
+
+    addSounds(createFxName);
+    addSounds(createFxSoundsName);
+    addEffects();
+
+    auto addMapAsset = [&](const QString& type, const QString& ext)
+    {
+        QString name = QString("%1/%2.d3dbsp").arg(map_prefix, map);
+
+        QString path = rootDir + "/" + name + ext;
+        QString pathJson = path + ".json";
+        if (!QFile::exists(path) && !QFile::exists(pathJson))
+        {
+            add_str("#");
+        }
+        add_asset(type, name);
+    };
+
+    auto addIterator = [&](const QString& type, const QString& folder,
+        const QString& extension, const QString& comment, bool usePath = true)
+    {
+        QDir dir(rootDir + "/" + folder);
+        if (!dir.exists())
+            return;
+
+        bool addedComment = false;
+        QStringList files = dir.entryList(QDir::Files | QDir::NoSymLinks);
+        for (const QString& file : files)
+        {
+            if (!file.endsWith(extension, Qt::CaseInsensitive))
+                continue;
+
+            if (!addedComment)
+            {
+                addedComment = true;
+                add_line(comment);
+            }
+
+            if (!usePath)
+            {
+                // Remove folder prefix and extension from filename
+                // Since file is just the filename, we just remove extension
+                QString name = file.left(file.length() - extension.length());
+                add_asset(type, name);
+            }
+            else
+            {
+                // Provide relative path from folder
+                QString name = folder + file;
+                add_asset(type, name);
+            }
+        }
+
+        if (addedComment)
+        {
+            add_line("");
+        }
+    };
+
+    auto addIfExists = [&](const QString& text, const QString& path) -> bool
+    {
+        if (!QFile::exists(rootDir + "/" + path))
+            return false;
+
+        add_line(text);
+        return true;
+    };
+
+    {
+        QString compassName = QString("compass_map_%1").arg(map);
+        QString compassPath = QString("materials/%1.json").arg(compassName);
+        addIfExists(QString("// compass\nmaterial,%1\n").arg(compassName), compassPath);
+    }
+
+    addIterator("stringtable", "maps/createart/", ".csv", "// lightsets");
+    addIterator("clut", "clut/", ".clut", "// color lookup tables", false);
+    addIterator("rawfile", "vision/", ".vision", "// visions");
+    addIterator("rawfile", "sun/", ".sun", "// sun");
+
+    auto addGsc = [&](const QString& path)
+    {
+        QString gscPath = rootDir + "/" + path;
+        if (!QFile::exists(gscPath))
+        {
+            add_str("#");
+        }
+        add_asset("rawfile", path);
+    };
+
+    auto addGscIfExists = [&](const QString& path) -> bool
+    {
+        QString gscPath = rootDir + "/" + path;
+        if (!QFile::exists(gscPath))
+            return false;
+
+        add_asset("rawfile", path);
+        return true;
+    };
+
+    add_line("// gsc");
+    addGsc(QString("%1/%2.gsc").arg(map_prefix, map));
+    addGsc(fxName);
+    addGsc(createFxName);
+    addGscIfExists(createFxSoundsName);
+    addGscIfExists(QString("%1/%2_precache.gsc").arg(map_prefix, map));
+    addGscIfExists(QString("%1/%2_lighting.gsc").arg(map_prefix, map));
+    addGscIfExists(QString("%1/%2_aud.gsc").arg(map_prefix, map));
+    addGsc(QString("maps/createart/%1_art.gsc").arg(map));
+    addGsc(QString("maps/createart/%1_fog.gsc").arg(map));
+    addGsc(QString("maps/createart/%1_fog_hdr.gsc").arg(map));
+    add_line("");
+
+    auto animated_models = mapEntsRead.getAnimatedModels();
+    if (!animated_models.isEmpty()) {
+        addGsc(QString("%1/_animatedmodels.gsc").arg(map_prefix));
+
+        for (auto& animated_model : animated_models) {
+            if (!animated_model.precacheScript.isEmpty()) {
+                QString precacheScript = animated_model.precacheScript;
+                precacheScript = precacheScript.replace(' ', '/') + ".gsc";
+                addGsc(precacheScript);
+                auto vars = parseAnimatedModelScript(QtUtils::readFile(rootDir + "/" + precacheScript));
+                for (auto it = vars.constBegin(); it != vars.constEnd(); ++it) {
+                    add_asset("model", it.key());
+                    add_asset("xanim", it.value());
+                }
+            }
+        }
+
+        add_line("");
+    }
+
+    auto destructible = mapEntsRead.getDestructibles();
+    if (!destructible.isEmpty()) {
+        addGsc("common_scripts/_destructible.gsc");
+        addGsc("common_scripts/_destructible_types.gsc");
+        add_asset("rawfile", "animtrees/chicken.atr");
+        add_line("");
+
+        // how tf do we add the assets required by destructibles?? just iterating all is wasteful...
+    }
+
+    qInfo() << "Adding map assets...";
+
+    add_line("// map assets");
+    addMapAsset("com_map", ".commap");
+    addMapAsset("fx_map", ".fxmap");
+    addMapAsset("gfx_map", ".gfxmap");
+    addMapAsset("map_ents", ".ents");
+    addMapAsset("glass_map", ".glassmap");
+    addMapAsset("phys_worldmap", ".physmap");
+    addMapAsset("aipaths", ".aipaths");
+    addMapAsset(!isMpMap ? "col_map_sp" : "col_map_mp", ".colmap");
+    add_line("");
+
+    save();
+}
+
 // export
 void H1ModTools::exportSelection()
 {
@@ -1015,14 +1599,21 @@ void H1ModTools::exportSelection()
             QtUtils::moveDirectory(dumpFolder, destFolder);
 
             if (ui.convertGscCheckBox->isChecked()) {
-				CopyGSCFiles(destFolder); // Copy default GSC files to the zone folder
-				ConvertGSCFiles(destFolder); // Convert GSC files to H1 format
-                
                 // Copy template files here, maybe need to change this later
 				const auto isMap = Funcs::H1::isMap(zone);
                 if (isMap)
                 {
                     const auto isMpMap = Funcs::H1::isMpMap(zone);
+
+                    auto mapEntsRead = MapEntsReader(isMpMap ? 
+                        QString("%1/zonetool/%2/maps/mp/%2.d3dbsp.ents").arg(Globals.pathH1, zone) : 
+                        QString("%1/zonetool/%2/maps/%2.d3dbsp.ents").arg(Globals.pathH1, zone));
+
+                    CopyGSCFiles(destFolder); // Copy default GSC files to the zone folder
+                    ConvertGSCFiles(destFolder, { // Convert GSC files to H1 format
+                        .hasDestructibles = !mapEntsRead.getDestructibles().empty(), 
+                        .hasAnimatedModels = !mapEntsRead.getAnimatedModels().empty(), 
+                        .isMpMap = isMpMap});
 
                     const auto addTemplateFile = [zone](const QString& templatePath, const QString& destFolder, const QString& destFile)
                     {
@@ -1050,10 +1641,15 @@ void H1ModTools::exportSelection()
                         Funcs::Shared::replaceStringInFile(destFolder + "/maps/createart/" + zone + "_fog_hdr.gsc", "maps\\mp\\_art::create_vision_set_fog", "maps\\_utility::create_vision_set_fog");
                     }
                 }
+                else
+                {
+                    ConvertGSCFiles(destFolder, {.isMpMap = Funcs::H1::isMpMap(zone) }); // Convert GSC files to H1 format
+                }
             }
 
             if (ui.generateCsvCheckBox->isChecked()) {
                 // generate CSV...
+                generateCSV(zone, destFolder, Funcs::H1::isMpMap(zone), gameType);
             }
 
             restoreUiState();

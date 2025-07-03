@@ -163,7 +163,7 @@ QString transformFunctionCalls(const QString& input, const QVector<FunctionMappi
 }
 
 // Main function
-void ConvertGSCFile(const QString& gscPath)
+void ConvertGSCFile(const QString& gscPath, GSC_Convert_Settings settings)
 {
     // 1. Setup your mappings and rules
 
@@ -193,10 +193,28 @@ void ConvertGSCFile(const QString& gscPath)
     QString content = in.readAll();
     gscFile.close();
 
-    if (content.contains("_load::main()"))
+    const auto loadname = settings.isMpMap ? QString("maps\\mp\\_load::main") : QString("maps\\_load::main");
+    if (content.contains(loadname))
     {
-        insertionRules.append({ "main", "", QString("maps\\createart\\%1_art::main();").arg(QFileInfo(gscPath).baseName()) }); // Insert at start of main()
-        //insertionRules.append({ "main", "maps\\mp\\_load::main", "thread common_scripts\\_destructible::init();" }); // Insert after _load::main()
+        if (!content.contains("_art::main()"))
+            insertionRules.append({ "main", "", QString("maps\\createart\\%1_art::main();").arg(QFileInfo(gscPath).baseName()) }); // Insert at start of main()
+        if(settings.hasDestructibles)
+            insertionRules.append({ "main", loadname, 
+                "thread common_scripts\\_destructible::init();" }); // Insert after _load::main()
+        if (settings.hasPipes)
+            insertionRules.append({ "main", loadname,
+                "thread common_scripts\\_pipes::init();" });
+        if(settings.hasAnimatedModels)
+            insertionRules.append({ "main", loadname, settings.isMpMap ? 
+                "thread maps\\mp\\_animatedmodels::main();" : 
+                "thread maps\\_animatedmodels::main();" });
+        if (settings.hasRadiation)
+            insertionRules.append({ "main", loadname, settings.isMpMap ? 
+                "thread maps\\mp\\_radiation::radiation();" :
+                "thread maps\\_radiation::main();" });
+        if(settings.hasMinefields)
+            insertionRules.append({ "main", loadname, 
+				"thread maps\\mp\\_minefields::minefields();" });
     }
 
     // 3. Parse functions and process them individually
@@ -266,7 +284,7 @@ QStringList findAllGSCFiles(const QString& root)
 	return result;
 }
 
-void ConvertGSCFiles(const QString& destinationPath)
+void ConvertGSCFiles(const QString& destinationPath, GSC_Convert_Settings settings)
 {
 	// For each gsc file in destinationPath, convert the GSC file.
 	QDir dir(destinationPath);
@@ -277,7 +295,7 @@ void ConvertGSCFiles(const QString& destinationPath)
 	QStringList gscFiles = findAllGSCFiles(destinationPath);
 	for (const QString& path : gscFiles) {
 		qDebug() << "[ConvertGSCFiles] Converting GSC file:" << path;
-		ConvertGSCFile(path);
+		ConvertGSCFile(path, settings);
 	}
 	qDebug() << "All GSC files converted in:" << destinationPath;
 }
