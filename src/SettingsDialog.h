@@ -1,6 +1,8 @@
 #pragma once
 #include "Globals.h"
 
+#include "ui_SettingsDialog.h"
+
 void setupStyle();
 
 namespace Ui {

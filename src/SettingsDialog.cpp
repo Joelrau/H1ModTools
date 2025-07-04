@@ -1,5 +1,4 @@
 ﻿#include "SettingsDialog.h"
-#include "ui_SettingsDialog.h"
 
 void setupStyle()
 {
