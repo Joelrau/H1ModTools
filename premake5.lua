@@ -65,7 +65,7 @@ project "H1ModTools"
     qtprefix "Qt6"
 
     -- Copy static files to build folder
-    local staticSource = path.getabsolute("src/static")
+    local staticSource = path.getabsolute("static")
     local staticDest = path.join(targetDir, "static")
     postbuildcommands {
         string.format('(robocopy "%s" "%s" /e) ^& exit 0', staticSource, staticDest)
