@@ -1114,7 +1114,7 @@ void H1ModTools::exportSelection()
             }
 
             if (ui.generateCsvCheckBox->isChecked()) {
-                generateCSV(zone, destFolder, Funcs::H1::isMpMap(zone), gameType);
+                generateCSV(zone, destFolder, Funcs::H1::isMpMap(zone), gameType, GameType::H1);
             }
 
             restoreUiState();
