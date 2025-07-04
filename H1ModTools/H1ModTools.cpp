@@ -1055,9 +1055,9 @@ void H1ModTools::exportSelection()
                 {
                     const auto isMpMap = Funcs::H1::isMpMap(zone);
 
-                    auto mapEntsRead = MapEntsReader(isMpMap ? 
-                        QString("%1/zonetool/%2/maps/mp/%2.d3dbsp.ents").arg(Globals.pathH1, zone) : 
-                        QString("%1/zonetool/%2/maps/%2.d3dbsp.ents").arg(Globals.pathH1, zone));
+                    const QString mapsPrefix = isMpMap ? "maps/mp" : "maps";
+
+                    auto mapEntsRead = MapEntsReader(QString("%1/zonetool/%2/%3/%2.d3dbsp.ents").arg(Globals.pathH1, zone, mapsPrefix));
 
                     CopyGSCFiles(destFolder); // Copy default GSC files to the zone folder
                     ConvertGSCFiles(destFolder, { // Convert GSC files to H1 format
@@ -1090,6 +1090,8 @@ void H1ModTools::exportSelection()
                         Funcs::Shared::replaceStringInFile(destFolder + "/maps/createart/" + zone + "_fog.gsc", "maps\\mp\\_art::create_vision_set_fog", "maps\\_utility::create_vision_set_fog");
                         Funcs::Shared::replaceStringInFile(destFolder + "/maps/createart/" + zone + "_fog_hdr.gsc", "maps\\mp\\_art::create_vision_set_fog", "maps\\_utility::create_vision_set_fog");
                     }
+
+                    // we need to add static/botpathways/ and copy the one for the map if it exists to destFolder/<mapPrefix>
                 }
                 else
                 {

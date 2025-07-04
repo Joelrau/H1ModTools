@@ -5,7 +5,6 @@ QSet<QString> parseCreateFxGsc(const QString& data)
 {
     QSet<QString> sounds;
 
-    // Correctly escaped string:
     QRegularExpression regex("\\w+\\.v\\[\\s*\"soundalias\"\\s*\\]\\s*=\\s*\"([\\w\\s]+?)\"",
         QRegularExpression::CaseInsensitiveOption);
 
@@ -39,7 +38,7 @@ QSet<QString> parseFxGsc(const QString& data)
 QMap<QString, QString> parseAnimatedModelScript(const QString& scriptText)
 {
     QMap<QString, QString> result;
-    QMap<QString, QString> variableMap;      // varName -> "modelName"
+    QMap<QString, QString> variableMap;
 
     // Match: variableName = "modelName";
     QRegularExpression varAssignRegex("\\b([a-zA-Z_][a-zA-Z0-9_]*)\\s*=\\s*\"([^\"]+)\"");
@@ -50,7 +49,7 @@ QMap<QString, QString> parseAnimatedModelScript(const QString& scriptText)
         variableMap.insert(match.captured(1), match.captured(2));
     }
 
-    // Match: level.anim_prop_models[variableName]["..."] = "variation";
+    // Match: level.anim_prop_models[variableName]["..."] = "animationName";
     QRegularExpression animPropUseRegex("level\\.anim_prop_models\\[\\s*([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\]\\s*\\[\\s*\"[^\"]+\"\\s*\\]\\s*=\\s*\"([^\"]+)\"");
     QRegularExpressionMatchIterator useIter = animPropUseRegex.globalMatch(scriptText);
     while (useIter.hasNext())
@@ -92,11 +91,11 @@ void generateCSV(const QString& zone, const QString& destFolder, const bool isMp
         }
     };
 
-    const QString map_prefix = isMpMap
+    const QString mapPrefix = isMpMap
         ? "maps/mp"
         : "maps";
-    const QString map_prefix_full = destFolder + "/" + map_prefix + "/";
-    const QString mapents_path = map_prefix_full + zone + ".d3dbsp.ents";
+    const QString mapPrefixFull = destFolder + "/" + mapPrefix + "/";
+    const QString mapentsPath = mapPrefixFull + zone + ".d3dbsp.ents";
 
     const auto addStr = [&](const QString& str)
     {
@@ -175,9 +174,7 @@ void generateCSV(const QString& zone, const QString& destFolder, const bool isMp
         addLine("");
     }
 
-    auto mapEntsRead = MapEntsReader(isMpMap ?
-        QString("%1/zonetool/%2/maps/mp/%2.d3dbsp.ents").arg(Globals.pathH1, map) :
-        QString("%1/zonetool/%2/maps/%2.d3dbsp.ents").arg(Globals.pathH1, map));
+    auto mapEntsRead = MapEntsReader(mapentsPath);
 
     auto models = mapEntsRead.getAllModels();
     if (!models.isEmpty()) {
@@ -212,7 +209,7 @@ void generateCSV(const QString& zone, const QString& destFolder, const bool isMp
         addLine("");
     };
 
-    QString fxName = QString("%1/%2_fx.gsc").arg(map_prefix, map);
+    QString fxName = QString("%1/%2_fx.gsc").arg(mapPrefix, map);
     auto addEffects = [&]() {
         QString fxPath = QString("%1/%2").arg(rootDir, fxName);
 
@@ -240,7 +237,7 @@ void generateCSV(const QString& zone, const QString& destFolder, const bool isMp
 
     auto addMapAsset = [&](const QString& type, const QString& ext)
     {
-        QString name = QString("%1/%2.d3dbsp").arg(map_prefix, map);
+        QString name = QString("%1/%2.d3dbsp").arg(mapPrefix, map);
 
         QString path = rootDir + "/" + name + ext;
         QString pathJson = path + ".json";
@@ -249,6 +246,16 @@ void generateCSV(const QString& zone, const QString& destFolder, const bool isMp
             addStr("#");
         }
         addAsset(type, name);
+    };
+
+    auto addBotPathsIfExists = [&]()
+    {
+        QString name = QString("%1/%2.csv").arg(mapPrefix, map);
+        QString path = rootDir + "/" + name;
+        if (QFile::exists(path))
+        {
+            addAsset("aipaths", name);
+        }
     };
 
     auto addIterator = [&](const QString& type, const QString& folder,
@@ -273,14 +280,11 @@ void generateCSV(const QString& zone, const QString& destFolder, const bool isMp
 
             if (!usePath)
             {
-                // Remove folder prefix and extension from filename
-                // Since file is just the filename, we just remove extension
                 QString name = file.left(file.length() - extension.length());
                 addAsset(type, name);
             }
             else
             {
-                // Provide relative path from folder
                 QString name = folder + file;
                 addAsset(type, name);
             }
@@ -333,13 +337,13 @@ void generateCSV(const QString& zone, const QString& destFolder, const bool isMp
     };
 
     addLine("// gsc");
-    addGsc(QString("%1/%2.gsc").arg(map_prefix, map));
+    addGsc(QString("%1/%2.gsc").arg(mapPrefix, map));
     addGsc(fxName);
     addGsc(createFxName);
     addGscIfExists(createFxSoundsName);
-    addGscIfExists(QString("%1/%2_precache.gsc").arg(map_prefix, map));
-    addGscIfExists(QString("%1/%2_lighting.gsc").arg(map_prefix, map));
-    addGscIfExists(QString("%1/%2_aud.gsc").arg(map_prefix, map));
+    addGscIfExists(QString("%1/%2_precache.gsc").arg(mapPrefix, map));
+    addGscIfExists(QString("%1/%2_lighting.gsc").arg(mapPrefix, map));
+    addGscIfExists(QString("%1/%2_aud.gsc").arg(mapPrefix, map));
     addGsc(QString("maps/createart/%1_art.gsc").arg(map));
     addGsc(QString("maps/createart/%1_fog.gsc").arg(map));
     addGsc(QString("maps/createart/%1_fog_hdr.gsc").arg(map));
@@ -347,7 +351,7 @@ void generateCSV(const QString& zone, const QString& destFolder, const bool isMp
 
     auto animated_models = mapEntsRead.getAnimatedModels();
     if (!animated_models.isEmpty()) {
-        addGsc(QString("%1/_animatedmodels.gsc").arg(map_prefix));
+        addGsc(QString("%1/_animatedmodels.gsc").arg(mapPrefix));
 
         for (auto& animated_model : animated_models) {
             if (!animated_model.precacheScript.isEmpty()) {
@@ -375,9 +379,12 @@ void generateCSV(const QString& zone, const QString& destFolder, const bool isMp
         // how tf do we add the assets required by destructibles?? just iterating all is wasteful...
     }
 
+    // we need to parse the map gsc for precacheModel and ambientPlay/playSounds?
+
     qInfo() << "Adding map assets...";
 
     addLine("// map assets");
+    addBotPathsIfExists();
     addMapAsset("com_map", ".commap");
     addMapAsset("fx_map", ".fxmap");
     addMapAsset("gfx_map", ".gfxmap");
