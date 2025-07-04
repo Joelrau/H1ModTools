@@ -5,13 +5,6 @@
 
 #include "LogRedirector.h"
 
-enum GameType {
-    H1,
-    IW3,
-    IW4,
-    IW5
-};
-
 class H1ModTools : public QMainWindow
 {
     Q_OBJECT
