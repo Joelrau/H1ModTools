@@ -3,8 +3,13 @@
 
 #include <QApplication>
 
-int main(int argc, char *argv[])
+#include <Windows.h>
+
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
+    int argc = 0;
+    char** argv = nullptr;
+
     QApplication a(argc, argv);
 
     QCoreApplication::setOrganizationDomain("auroramod.dev");
@@ -13,5 +18,6 @@ int main(int argc, char *argv[])
 
     H1ModTools w;
     w.show();
+
     return a.exec();
 }

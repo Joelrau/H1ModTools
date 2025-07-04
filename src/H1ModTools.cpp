@@ -278,26 +278,28 @@ void H1ModTools::on_settingsButton_clicked()
 QString findGameFolderInAllDrives(const QString& folderName)
 {
     const QStringList potentialSteamPaths = {
-        "Program Files/Steam/steamapps/common/",
-        "Program Files (x86)/Steam/steamapps/common/",
-        "SteamLibrary/steamapps/common/",
+        "Program Files/Steam/steamapps/common",
+        "Program Files (x86)/Steam/steamapps/common",
+        "SteamLibrary/steamapps/common"
     };
 
     for (const QStorageInfo& drive : QStorageInfo::mountedVolumes()) {
         if (!drive.isValid() || !drive.isReady())
             continue;
 
-        const QString rootPath = drive.rootPath();
+        QDir rootDir(drive.rootPath());
 
         for (const QString& steamPath : potentialSteamPaths) {
-            const QString fullPath = QDir::cleanPath(rootPath + "/" + steamPath + folderName);
+            QDir steamDir(rootDir.filePath(steamPath));
+            QString fullPath = steamDir.filePath(folderName);
+
             if (QDir(fullPath).exists()) {
                 return fullPath;
             }
         }
     }
 
-    return {};
+    return QString{};
 }
 
 void generateSettings(QWidget* parent)
@@ -944,6 +946,12 @@ void dumpZoneToolAssets()
 void H1ModTools::exportSelection()
 {
     const auto gameType = getCurrentGameType();
+
+    auto targetPath = Funcs::Shared::getGamePath(GameType::H1);
+    if (targetPath.isEmpty() || !QDir(targetPath).exists()) {
+        qWarning() << "H1 game path is not set or does not exist.";
+        return;
+    }
     
     static const auto getExecutableName = [gameType]() -> QString {
         switch (gameType)

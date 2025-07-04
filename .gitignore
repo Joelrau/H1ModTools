@@ -367,3 +367,6 @@ H1ModTools/settings.json
 
 # Rider
 .idea
+
+# Build results
+build
