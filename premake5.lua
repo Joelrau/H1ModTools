@@ -68,7 +68,7 @@ project "H1ModTools"
     local staticSource = path.getabsolute("static")
     local staticDest = path.join(path.translate("%{cfg.targetdir}"), "static")
     postbuildcommands {
-        string.format('(robocopy "%s" "%s" /e) ^& exit 0', staticSource, staticDest)
+        string.format('cmd /c robocopy "%s" "%s" /e /nfl /ndl /njh /njs /nc /ns /np > nul 2>&1 ^& exit 0', staticSource, staticDest)
     }
 
     filter "configurations:Debug"
