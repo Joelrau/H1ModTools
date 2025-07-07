@@ -238,6 +238,12 @@ namespace Funcs
             const QDir map_source_dir(Globals.pathIW3 + "/map_source/");
             return map_source_dir.exists() && QFile::exists(map_source_dir.filePath(name));
         }
+
+        bool isMapSourceExportable(const QString& name)
+        {
+            const QDir map_source_dir(Globals.pathIW3 + "/zone/english/");
+            return map_source_dir.exists() && QFile::exists(map_source_dir.filePath(name + ".ff"));
+        }
     }
 }
 
@@ -373,9 +379,10 @@ void H1ModTools::setupListWidgets()
             const auto raw_name = QFileInfo(current->text(0)); // get this as string
             qDebug() << "Current IW3 item:" << raw_name.completeBaseName();
 
-            auto is_map_source = Funcs::IW3::isMapSource(raw_name.fileName());
+            const auto is_map_source = Funcs::IW3::isMapSource(raw_name.fileName());
+            const auto is_source_exportable = Funcs::IW3::isMapSourceExportable(raw_name.completeBaseName());
 
-            updateExportButtonStates(true, false);
+            updateExportButtonStates(true, (is_map_source && !is_source_exportable));
             updateMapButtonStates(true, !is_map_source);
         }
     });
@@ -1158,7 +1165,7 @@ void H1ModTools::buildIW3MapFastfile(const QString& mapName, const QString& cod4
         return;
     }
 
-    const auto hasMapCsv = QFile::exists(zoneSourceDir + "/" + mapName + "_load.csv");
+    const auto hasMapCsv = QFile::exists(zoneSourceDir + "/" + mapName + ".csv");
     if (!hasMapCsv)
     {
         qCritical() << "Failed to find map CSV for map" << mapName;
