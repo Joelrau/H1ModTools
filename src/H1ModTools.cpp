@@ -218,6 +218,11 @@ namespace Funcs
                 return false;
             }
 
+            if (QFile::exists(zoneDir.filePath(zone + ".ff")))
+            {
+                return true;
+            }
+
             for (const QString& lang : languageFolders) {
                 QDir langDir(zoneDir.filePath(lang));
                 if (langDir.exists() && QFile::exists(langDir.filePath(zone + ".ff"))) {
@@ -524,7 +529,8 @@ void H1ModTools::updateVisibility()
     ui.buildZoneButton->setVisible(canCompile);
     ui.compileReflectionsButton->setVisible(canCompile);
     ui.runMapButton->setVisible(canCompile);
-	ui.mapRunCmdsText->setVisible(canCompile);
+    ui.mapRunCmdsText->setVisible(canCompile);
+    ui.moveToUsermapsCheckBox->setVisible(canCompile);
     ui.cheatsCheckBox->setVisible(canCompile);
     ui.developerCheckBox->setVisible(canCompile);
 
@@ -652,11 +658,14 @@ void H1ModTools::on_buildZoneButton_clicked()
         }
 
         // Move map files to usermaps
-        if (isMap && !Funcs::H1::moveToUsermaps(currentSelectedZone)) {
-            qWarning() << "Failed to move" << currentSelectedZone << "to usermaps";
-        }
-        else if (isMap) {
-            qDebug() << "Moved" << currentSelectedZone << "to usermaps";
+        if (ui.moveToUsermapsCheckBox->isChecked())
+        {
+            if (isMap && !Funcs::H1::moveToUsermaps(currentSelectedZone)) {
+                qWarning() << "Failed to move" << currentSelectedZone << "to usermaps";
+            }
+            else if (isMap) {
+                qDebug() << "Moved" << currentSelectedZone << "to usermaps";
+            }
         }
 
         qDebug() << "Compiled zone" << currentSelectedZone;
@@ -1463,6 +1472,7 @@ void H1ModTools::disableUiAndStoreState() {
         ui.mapRunCmdsText,
         ui.settingsButton,
         ui.tabWidget,
+        ui.moveToUsermapsCheckBox,
         ui.cheatsCheckBox,
         ui.developerCheckBox,
         ui.generateCsvCheckBox,

@@ -239,6 +239,16 @@
         </widget>
        </item>
        <item>
+        <widget class="QCheckBox" name="moveToUsermapsCheckBox">
+         <property name="text">
+          <string>Move to Usermaps</string>
+         </property>
+         <property name="checked">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
         <widget class="QPushButton" name="compileReflectionsButton">
          <property name="text">
           <string>2. Compile Reflections</string>
