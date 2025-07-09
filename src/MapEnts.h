@@ -22,6 +22,7 @@ public:
         void clear() {
             vars.clear();
         }
+
         void add_var(const MapEntVar& var)
         {
             vars.append(var);
@@ -40,7 +41,6 @@ public:
             return "";
         }
 
-    private:
         QList<MapEntVar> vars;
     };
 
@@ -78,6 +78,9 @@ public:
     QSet<DestructibleData> getDestructibles() const { return destructibles; }
     QSet<AnimatedModelData> getAnimatedModels() const { return animatedModels; }
     QStringList getAllModels() const { return models; }
+
+    bool globalIntermissionExists;
+    QList<MapEnts::MapEntity> mapEnts;
 
 private:
     QSet<DestructibleData> destructibles;

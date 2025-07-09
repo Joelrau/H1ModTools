@@ -1072,16 +1072,64 @@ void H1ModTools::exportSelection()
             const QString destFolder = Globals.pathH1 + "/zonetool/" + zone;
             QtUtils::moveDirectory(dumpFolder, destFolder);
 
+            const auto isMpMap = Funcs::H1::isMpMap(zone);
+            const QString mapsPrefix = isMpMap ? "maps/mp" : "maps";
+            const auto mapEntsPath = QString("%1/zonetool/%2/%3/%2.d3dbsp.ents").arg(Globals.pathH1, zone, mapsPrefix);
+
+            // sanity check map_ents contains necessary values
+            const auto isMap = Funcs::H1::isMap(zone);
+            if (isMap)
+            {
+                const auto mapEntsRead = MapEntsReader(mapEntsPath);
+
+                auto should_write_ents = false;
+                auto ents = mapEntsRead.mapEnts;
+
+#define ADD_MAPENTS_VAR(condition, classname) \
+                if (condition) \
+                { \
+                    qWarning() << "No" << classname << "exists in map_ents for " << currentSelectedText << ", creating..."; \
+                    MapEnts::MapEntity newEnt; \
+                    newEnt.add_var({ "classname", classname }); \
+                    newEnt.add_var({ "origin", "0 0 0" }); \
+                    newEnt.add_var({ "angles", "0 0 0" }); \
+                    ents.append(newEnt); \
+                    should_write_ents = true; \
+                }
+
+                ADD_MAPENTS_VAR(mapEntsRead.getAllModels().empty(), "script_model")
+                ADD_MAPENTS_VAR(!mapEntsRead.globalIntermissionExists, "mp_global_intermission")
+
+                QFile fileOut(mapEntsPath);
+                if (!fileOut.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate)) {
+                    qCritical() << "Failed to open ents file for writing:" << mapEntsPath;
+                    return;
+                }
+
+                if (should_write_ents)
+                {
+                    QTextStream out(&fileOut);
+
+                    for (const auto& entity : ents) {
+                        out << "{\n";
+                        for (const auto& var : entity.vars) {
+                            out << QString("\"%1\" \"%2\"\n").arg(var.key, var.value);
+                        }
+                        out << "}\n";
+                    }
+
+                    fileOut.close();
+                }
+            }
+
             if (ui.convertGscCheckBox->isChecked()) {
                 // Copy template files here, maybe need to change this later
-				const auto isMap = Funcs::H1::isMap(zone);
                 if (isMap)
                 {
                     const auto isMpMap = Funcs::H1::isMpMap(zone);
-
                     const QString mapsPrefix = isMpMap ? "maps/mp" : "maps";
 
-                    auto mapEntsRead = MapEntsReader(QString("%1/zonetool/%2/%3/%2.d3dbsp.ents").arg(Globals.pathH1, zone, mapsPrefix));
+                    const auto mapEntsRead = MapEntsReader(mapEntsPath);
 
                     CopyGSCFiles(destFolder); // Copy default GSC files to the zone folder
                     ConvertGSCFiles(destFolder, { // Convert GSC files to H1 format

@@ -69,13 +69,17 @@ MapEntsReader::MapEntsReader(const QString& mapEntsPath)
 
     this->destructibles.clear();
     this->animatedModels.clear();
+    this->globalIntermissionExists = false;
 
-    auto ents = mapEnts.ents;
-    for (auto& ent : ents)
+    this->mapEnts = mapEnts.ents;
+    for (auto& ent : this->mapEnts)
     {
         auto targetname = ent.get("targetname");
         auto classname = ent.get("classname");
         auto model = ent.get("model");
+
+        if (classname == "mp_global_intermission")
+            this->globalIntermissionExists = true;
 
         if (!model.isEmpty() && classname == "script_model")
             this->models.append(model);
