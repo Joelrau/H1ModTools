@@ -1262,6 +1262,12 @@ void H1ModTools::compileIW3MapReflections(const QString& mapName, const QString&
         return;
     }
 
+    if (!ui.compileReflectionsCheckBox->isChecked())
+    {
+        buildIW3MapFastfile(mapName, cod4Dir);
+        return;
+    }
+
     QProcess* proc = new QProcess();
     proc->setProgram(toolPath);
     proc->setWorkingDirectory(cod4Dir);
@@ -1438,7 +1444,8 @@ void H1ModTools::updateMapButtonStates(const bool is_visible, const bool is_disa
         ui.fastCheckBox,
         ui.extraCheckBox,
         ui.verboseCheckBox,
-        ui.modelShadowCheckBox
+        ui.modelShadowCheckBox,
+        ui.compileReflectionsCheckBox
     };
 
     for (auto* widget : map_build_widgets)
@@ -1481,7 +1488,8 @@ void H1ModTools::disableUiAndStoreState() {
         ui.fastCheckBox,
         ui.extraCheckBox,
         ui.verboseCheckBox,
-        ui.modelShadowCheckBox
+        ui.modelShadowCheckBox,
+        ui.compileReflectionsCheckBox
     };
 
     m_uiEnabledStates.clear();

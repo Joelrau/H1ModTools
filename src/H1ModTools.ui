@@ -213,6 +213,16 @@
            </property>
           </widget>
          </item>
+         <item>
+          <widget class="QCheckBox" name="compileReflectionsCheckBox">
+           <property name="text">
+            <string>Compile Reflections</string>
+           </property>
+           <property name="checked">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
         </layout>
        </item>
        <item>
