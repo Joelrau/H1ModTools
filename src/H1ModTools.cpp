@@ -1080,19 +1080,19 @@ void H1ModTools::exportSelection()
             const auto isMap = Funcs::H1::isMap(zone);
             if (isMap)
             {
-                const auto mapEntsRead = MapEntsReader(mapEntsPath);
+                auto mapEntsRead = MapEntsReader(mapEntsPath);
 
                 auto should_write_ents = false;
-                auto ents = mapEntsRead.mapEnts;
+                auto& ents = mapEntsRead.mapEnts.ents;
 
 #define ADD_MAPENTS_VAR(condition, classname) \
                 if (condition) \
                 { \
                     qWarning() << "No" << classname << "exists in map_ents for " << currentSelectedText << ", creating..."; \
                     MapEnts::MapEntity newEnt; \
-                    newEnt.add_var({ "classname", classname }); \
-                    newEnt.add_var({ "origin", "0 0 0" }); \
-                    newEnt.add_var({ "angles", "0 0 0" }); \
+                    newEnt.addVar({ "classname", classname }); \
+                    newEnt.addVar({ "origin", "0 0 0" }); \
+                    newEnt.addVar({ "angles", "0 0 0" }); \
                     ents.append(newEnt); \
                     should_write_ents = true; \
                 }
@@ -1100,30 +1100,13 @@ void H1ModTools::exportSelection()
                 ADD_MAPENTS_VAR(mapEntsRead.getAllModels().empty(), "script_model")
                 ADD_MAPENTS_VAR(!mapEntsRead.globalIntermissionExists, "mp_global_intermission")
 
-                QFile fileOut(mapEntsPath);
-                if (!fileOut.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate)) {
-                    qCritical() << "Failed to open ents file for writing:" << mapEntsPath;
-                    return;
-                }
-
                 if (should_write_ents)
                 {
-                    QTextStream out(&fileOut);
-
-                    for (const auto& entity : ents) {
-                        out << "{\n";
-                        for (const auto& var : entity.vars) {
-                            out << QString("\"%1\" \"%2\"\n").arg(var.key, var.value);
-                        }
-                        out << "}\n";
-                    }
-
-                    fileOut.close();
+                    mapEntsRead.mapEnts.writeEnts();
                 }
             }
 
             if (ui.convertGscCheckBox->isChecked()) {
-                // Copy template files here, maybe need to change this later
                 if (isMap)
                 {
                     const auto isMpMap = Funcs::H1::isMpMap(zone);
@@ -1137,6 +1120,7 @@ void H1ModTools::exportSelection()
                         .hasAnimatedModels = !mapEntsRead.getAnimatedModels().empty(), 
                         .isMpMap = isMpMap});
 
+                    // Copy template files here, maybe need to change this later
                     const auto addTemplateFile = [zone](const QString& templatePath, const QString& destFolder, const QString& destFile)
                     {
                         if (!QFile::exists(destFolder + destFile)) {
@@ -1197,14 +1181,13 @@ void H1ModTools::exportSelection()
 
     dumpZoneToolAssets();
 
+    const QString zone = QFileInfo(currentSelectedText).completeBaseName();
     if (!isUserMap) {
         // move map.ff and map_load.ff to zone/english
-        const QString zone = QFileInfo(currentSelectedText).completeBaseName();
         dumpZone(zone, true);
         // dump map load too...
     }
     else {
-        const QString zone = QFileInfo(currentSelectedText).completeBaseName();
         dumpZone(zone, true);
     }
 }

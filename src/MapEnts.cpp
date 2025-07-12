@@ -2,7 +2,7 @@
 
 MapEnts::MapEnts(const QString& mapEntsPath)
 {
-    this->path = mapEntsPath;
+    this->setPath(mapEntsPath);
 }
 
 MapEnts::~MapEnts()
@@ -10,8 +10,17 @@ MapEnts::~MapEnts()
     this->path.clear();
 }
 
-void MapEnts::readVars()
+void MapEnts::setPath(const QString& mapEntsPath)
 {
+    this->path = mapEntsPath;
+}
+
+void MapEnts::readEnts()
+{
+    if (this->path.isEmpty()) {
+        return;
+    }
+
     QFile file(this->path);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
         qWarning() << "Failed to open file:" << this->path;
@@ -53,17 +62,36 @@ void MapEnts::readVars()
             MapEntVar var{};
             var.key = match.captured(1).toLower();
             var.value = match.captured(2);
-            entity.add_var(var);
+            entity.addVar(var);
         }
+    }
+}
+
+void MapEnts::writeEnts()
+{
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        qWarning() << "Failed to open file for writing:" << path;
+        return;
+    }
+
+    QTextStream stream(&file);
+
+    for (const auto& entity : ents) {
+        stream << "{\n";
+        for (const auto& var : entity.vars) {
+            stream << QString("\"%1\" \"%2\"\n").arg(var.key, var.value);
+        }
+        stream << "}\n";
     }
 }
 
 MapEntsReader::MapEntsReader(const QString& mapEntsPath)
 {
-    auto mapEnts = MapEnts(mapEntsPath);
-    mapEnts.readVars();
+    this->mapEnts.setPath(mapEntsPath);
+    this->mapEnts.readEnts();
 
-    if (mapEnts.ents.isEmpty()) {
+    if (this->mapEnts.ents.isEmpty()) {
         return;
     }
 
@@ -71,8 +99,7 @@ MapEntsReader::MapEntsReader(const QString& mapEntsPath)
     this->animatedModels.clear();
     this->globalIntermissionExists = false;
 
-    this->mapEnts = mapEnts.ents;
-    for (auto& ent : this->mapEnts)
+    for (auto& ent : this->mapEnts.ents)
     {
         auto targetname = ent.get("targetname");
         auto classname = ent.get("classname");

@@ -5,6 +5,7 @@
 class MapEnts
 {
 public:
+    MapEnts() = default;
     MapEnts(const QString& mapEntsPath);
     ~MapEnts();
 
@@ -19,11 +20,12 @@ public:
     class MapEntity
     {
     public:
-        void clear() {
+        void clear()
+        {
             vars.clear();
         }
 
-        void add_var(const MapEntVar& var)
+        void addVar(const MapEntVar& var)
         {
             vars.append(var);
         }
@@ -46,12 +48,16 @@ public:
 
     QList<MapEntity> ents;
 
-    void readVars();
+    void setPath(const QString& mapEntsPath);
+    void readEnts();
+    void writeEnts();
 };
 
 class MapEntsReader
 {
 public:
+    MapEnts mapEnts;
+
     struct DestructibleData
     {
         QString name;   // destructible_type
@@ -80,7 +86,6 @@ public:
     QStringList getAllModels() const { return models; }
 
     bool globalIntermissionExists;
-    QList<MapEnts::MapEntity> mapEnts;
 
 private:
     QSet<DestructibleData> destructibles;
