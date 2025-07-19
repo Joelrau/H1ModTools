@@ -371,6 +371,7 @@ void H1ModTools::setupListWidgets()
             const bool isMap = Funcs::H1::isMap(name);
             ui.compileReflectionsButton->setEnabled(isMap);
             ui.runMapButton->setEnabled(isMap);
+			ui.moveToUsermapsCheckBox->setEnabled(isMap);
 			ui.mapRunCmdsText->setEnabled(isMap);
             ui.cheatsCheckBox->setEnabled(isMap);
             ui.developerCheckBox->setEnabled(isMap);
@@ -1153,6 +1154,9 @@ void H1ModTools::exportSelection()
                 {
                     ConvertGSCFiles(destFolder, {.isMpMap = Funcs::H1::isMpMap(zone) }); // Convert GSC files to H1 format
                 }
+
+                // move ignore list to dest
+                QtUtils::copyDirectory("static/zone_source/assetlist", destFolder + "/zone_source/assetlist");
 
                 // load <map>.iwd and dump images and sounds folder to destFolder
                 // we need to load dumped csv and get all the image references and try to get them from the raw/images folder

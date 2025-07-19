@@ -102,10 +102,15 @@ void generateCSV(const QString& zone, const QString& destFolder, const bool isMp
         csvContent.append(str);
     };
 
+    const auto lineBreak = [&]()
+    {
+        addStr("\n");
+    };
+
     const auto addLine = [&](const QString& line)
     {
         addStr(line);
-        addStr("\n");
+        lineBreak();
     };
 
     const auto addAsset = [&](const QString& type, const QString& name)
@@ -171,7 +176,22 @@ void generateCSV(const QString& zone, const QString& destFolder, const bool isMp
         addAsset("netconststrings", QString("ncs_%1_level").arg("acl"));
         addAsset("netconststrings", QString("ncs_%1_level").arg("lui"));
         addAsset("netconststrings", QString("ncs_%1_level").arg("lsr"));
-        addLine("");
+        lineBreak();
+    }
+
+    if (isMpMap)
+    {
+        addLine("ignore,assetlist/code_post_gfx_mp");
+        addLine("ignore,assetlist/common_mp");
+        addLine("ignore,assetlist/techsets_common_mp");
+        lineBreak();
+    }
+    else
+    {
+        addLine("ignore,assetlist/code_post_gfx_mp");
+        addLine("ignore,assetlist/common_mp");
+        addLine("ignore,assetlist/techsets_common_mp");
+        lineBreak();
     }
 
     auto mapEntsRead = MapEntsReader(mapentsPath);
@@ -182,7 +202,7 @@ void generateCSV(const QString& zone, const QString& destFolder, const bool isMp
         for (auto& model : models) {
             addAsset("xmodel", model);
         }
-        addLine("");
+        lineBreak();
     }
 
     QString createFxName = QString("maps/createfx/%1_fx.gsc").arg(map);
@@ -206,7 +226,7 @@ void generateCSV(const QString& zone, const QString& destFolder, const bool isMp
         for (const QString& sound : sounds) {
             addAsset("sound", sound);
         }
-        addLine("");
+        lineBreak();
     };
 
     QString fxName = QString("%1/%2_fx.gsc").arg(mapPrefix, map);
@@ -228,7 +248,7 @@ void generateCSV(const QString& zone, const QString& destFolder, const bool isMp
         for (const QString& effect : effects) {
             addAsset("fx", effect);
         }
-        addLine("");
+        lineBreak();
     };
 
     addSounds(createFxName);
@@ -292,7 +312,7 @@ void generateCSV(const QString& zone, const QString& destFolder, const bool isMp
 
         if (addedComment)
         {
-            addLine("");
+            lineBreak();
         }
     };
 
@@ -347,7 +367,7 @@ void generateCSV(const QString& zone, const QString& destFolder, const bool isMp
     addGsc(QString("maps/createart/%1_art.gsc").arg(map));
     addGsc(QString("maps/createart/%1_fog.gsc").arg(map));
     addGsc(QString("maps/createart/%1_fog_hdr.gsc").arg(map));
-    addLine("");
+    lineBreak();
 
     auto animated_models = mapEntsRead.getAnimatedModels();
     if (!animated_models.isEmpty()) {
@@ -366,7 +386,7 @@ void generateCSV(const QString& zone, const QString& destFolder, const bool isMp
             }
         }
 
-        addLine("");
+        lineBreak();
     }
 
     auto destructible = mapEntsRead.getDestructibles();
@@ -374,7 +394,7 @@ void generateCSV(const QString& zone, const QString& destFolder, const bool isMp
         addGsc("common_scripts/_destructible.gsc");
         addGsc("common_scripts/_destructible_types.gsc");
         addAsset("rawfile", "animtrees/chicken.atr");
-        addLine("");
+        lineBreak();
 
         // how tf do we add the assets required by destructibles?? just iterating all is wasteful...
     }
@@ -393,7 +413,7 @@ void generateCSV(const QString& zone, const QString& destFolder, const bool isMp
     addMapAsset("phys_worldmap", ".physmap");
     addMapAsset("aipaths", ".aipaths");
     addMapAsset(!isMpMap ? "col_map_sp" : "col_map_mp", ".colmap");
-    addLine("");
+    lineBreak();
 
     save();
 }

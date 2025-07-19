@@ -61,7 +61,7 @@ project "H1ModTools"
     qt.enable()
     qtuseexternalinclude(true)
     qtpath(qtDir)
-    qtmodules { "core", "gui", "widgets", "opengl" }
+    qtmodules { "core", "gui", "widgets" }
     qtprefix "Qt6"
 
     -- Copy static files to build folder
