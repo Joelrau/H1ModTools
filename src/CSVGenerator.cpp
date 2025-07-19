@@ -188,9 +188,9 @@ void generateCSV(const QString& zone, const QString& destFolder, const bool isMp
     }
     else
     {
-        addLine("ignore,assetlist/code_post_gfx_mp");
-        addLine("ignore,assetlist/common_mp");
-        addLine("ignore,assetlist/techsets_common_mp");
+        addLine("ignore,assetlist/code_post_gfx");
+        addLine("ignore,assetlist/common");
+        addLine("ignore,assetlist/techsets_common");
         lineBreak();
     }
 
