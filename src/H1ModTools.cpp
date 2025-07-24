@@ -2,9 +2,9 @@
 
 #include "SettingsDialog.h"
 
-#include "GSC.h"
-#include "MapEnts.h"
-#include "CSVGenerator.h"
+#include "Utils/GSC.h"
+#include "Utils/MapEnts.h"
+#include "Utils/CSVGenerator.h"
 
 const QStringList languageFolders = {
         "english", "french", "german", "spanish",

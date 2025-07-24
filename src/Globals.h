@@ -2,8 +2,9 @@
 
 #include <QtWidgets/QtWidgets>
 
-#include "QTUtils.h"
 #include "Shared.h"
+
+#include "Utils/QTUtils.h"
 
 struct Globals_e
 {

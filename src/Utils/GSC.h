@@ -1,5 +1,6 @@
 #pragma once
-#include "Globals.h"
+
+#include <QtWidgets/QtWidgets>
 
 struct GSC_Convert_Settings
 {

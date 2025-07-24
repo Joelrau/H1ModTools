@@ -1,5 +1,7 @@
 #include "GSC.h"
 
+#include "QTUtils.h"
+
 void CopyGSCFiles(const QString& destinationPath)
 {
 	QString sourcePath = "static/rawfiles/";

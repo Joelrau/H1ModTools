@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Globals.h"
+#include <QtWidgets/QtWidgets>
 
 class MapEnts
 {
