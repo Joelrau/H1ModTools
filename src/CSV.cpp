@@ -55,7 +55,7 @@ void CSV::writeFile(const QString& filePath, char delimiter, WriteFlags flags)
                 continue;
         }
 
-        QStringList outputRow = row;
+        Row outputRow = row;
 
         if ((flags & EnsureSameColumnSize) && static_cast<size_t>(outputRow.size()) < maxColumns)
         {

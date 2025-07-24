@@ -103,7 +103,7 @@ void generateCSV(const QString& zone, const QString& destFolder, const bool isMp
 
     const auto addEmptyLine = [&]()
     {
-        addRow({""});
+        addRow({});
 	};
 
     const auto addAsset = [&](const QString& type, const QString& name)

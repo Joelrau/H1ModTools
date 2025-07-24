@@ -3,7 +3,7 @@
 #include <QtWidgets/QtWidgets>
 
 #include "QTUtils.h"
-#include "SHared.h"
+#include "Shared.h"
 
 struct Globals_e
 {
