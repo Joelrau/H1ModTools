@@ -5,6 +5,7 @@
 #include "Utils/GSC.h"
 #include "Utils/MapEnts.h"
 #include "Utils/CSVGenerator.h"
+#include "Utils/CSV.h"
 
 const QStringList languageFolders = {
         "english", "french", "german", "spanish",
@@ -124,34 +125,38 @@ namespace Funcs
 
         bool moveToUsermaps(const QString& zone)
         {
-            const auto tryMoveFile = [](const QString& folder, const QString& zoneName, const QString& ext = "") -> bool {
-                QString sourcePath = Globals.pathH1 + "/zone/" + zoneName + ext;
-                QString targetFolder = Globals.pathH1 + "/usermaps/" + folder;
+            auto tryMoveFile = [](const QString& folder, const QString& fileName, const QString& extension) -> bool {
+                const QString sourcePath = Globals.pathH1 + "/zone/" + fileName + extension;
+                const QString targetFolder = Globals.pathH1 + "/usermaps/" + folder;
+                const QString targetPath = targetFolder + "/" + fileName + extension;
 
                 QFile sourceFile(sourcePath);
                 if (!sourceFile.exists())
                     return false;
 
                 QDir dir;
-                if (!dir.exists(targetFolder)) {
-                    if (!dir.mkpath(targetFolder))
-                        return false;
-                }
+                if (!dir.exists(targetFolder) && !dir.mkpath(targetFolder))
+                    return false;
 
-                QString targetPath = targetFolder + "/" + zoneName + ext;
                 if (QFile::exists(targetPath))
-                    QFile::remove(targetPath); // Overwrite if exists
+                    QFile::remove(targetPath);
 
                 return sourceFile.rename(targetPath);
             };
 
             if (isMapLoad(zone)) {
-                const QString folder = zone.left(zone.length() - 5); // remove "_load"
-                if (tryMoveFile(folder, zone, ".ff"))
+                const QString folderName = zone.left(zone.length() - 5); // remove "_load"
+                if (tryMoveFile(folderName, zone, ".ff"))
                     return true;
             }
 
-            if (tryMoveFile(zone, zone, ".ff") || tryMoveFile(zone, zone, ".pak"))
+            if (!tryMoveFile(zone, zone, ".pak")) {
+                const QString oldPakPath = Globals.pathH1 + "/usermaps/" + zone + "/" + zone + ".pak";
+                if (QFile::exists(oldPakPath))
+                    QFile::remove(oldPakPath);
+            }
+
+            if (tryMoveFile(zone, zone, ".ff"))
                 return true;
 
             return false;
@@ -626,6 +631,7 @@ void H1ModTools::on_buildZoneButton_clicked()
     const auto isMap = Funcs::H1::isMap(currentSelectedZone) || Funcs::H1::isMapLoad(currentSelectedZone);
 
     QStringList arguments;
+    arguments << "-unbuffered-io" <<
     arguments << "-buildzone" << currentSelectedZone;
 
     qDebug() << "Building zone" << currentSelectedZone;
@@ -941,6 +947,37 @@ void convertMp3ToFlacForFolder(const QString& folder)
     }
 }
 
+QStringList getImagesFromCsv(const QString& path, const bool includeReferenced = true)
+{
+    CSV csv;
+    csv.readFile(path);
+
+    QStringList images;
+
+    for (const auto& row : csv.rows()) {
+        if (row.size() < 2)
+            continue;
+
+        const QString type = row[0].trimmed();
+        const QString image = row[1].trimmed();
+
+        if (type != "image")
+            continue;
+
+        if (!image.isEmpty()) {
+            if (!images.contains(image))
+                images.append(image);
+        }
+        else if (includeReferenced && row.size() > 2) {
+            const QString referencedImage = row[2].trimmed();
+            if (!referencedImage.isEmpty() && !images.contains(referencedImage))
+                images.append(referencedImage);
+        }
+    }
+
+    return images;
+}
+
 void dumpMainIwds()
 {
     // we need to dump all the .iwd files from main to zonetool_assets/<game>
@@ -1184,6 +1221,7 @@ void H1ModTools::exportSelection()
     };
 
     dumpZoneToolAssets();
+    // we need to also dump techset zones to zonetool_paths if it's not already done...
 
     const QString zone = QFileInfo(currentSelectedText).completeBaseName();
     if (!isUserMap) {

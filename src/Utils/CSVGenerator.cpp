@@ -273,11 +273,16 @@ void generateCSV(const QString& zone, const QString& destFolder, const bool isMp
 
     auto addBotPathsIfExists = [&]()
     {
-        QString name = QString("%1/%2.csv").arg(mapPrefix, map);
-        QString path = rootDir + "/" + name;
-        if (QFile::exists(path))
-        {
-            addAsset("aipaths", name);
+        QStringList possibleFiles = {
+            QString("%1/%2_wp.csv").arg(mapPrefix, map),
+            QString("%1/%2.csv").arg(mapPrefix, map)
+        };
+
+        for (const QString& name : possibleFiles) {
+            QString path = rootDir + "/" + name;
+            if (QFile::exists(path)) {
+                addAsset("aipaths", name);
+            }
         }
     };
 
