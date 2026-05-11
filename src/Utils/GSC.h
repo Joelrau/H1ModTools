@@ -16,4 +16,3 @@ struct GSC_Convert_Settings
 QStringList findAllGSCFiles(const QString& root);
 
 void ConvertGSCFiles(const QString& destinationPath, GSC_Convert_Settings settings);
-void CopyGSCFiles(const QString& destinationPath);

@@ -170,45 +170,49 @@ namespace Funcs
             QDir sourceDir(sourceFolder);
             QDir targetDir(targetFolder);
 
-            // Both source and target directories must exist
-            if (!sourceDir.exists() || !targetDir.exists()) {
+            if (!sourceDir.exists() || !targetDir.exists())
+            {
                 qWarning() << "Required folder does not exist:"
                     << (!sourceDir.exists() ? sourceFolder : targetFolder);
                 return false;
             }
 
-            // Get _reflection_probe*.dds files and ensure at least one exists
-            const QStringList ddsFiles = sourceDir.entryList(QStringList() << "_reflection_probe*.dds", QDir::Files);
-            if (ddsFiles.isEmpty()) {
+            const QStringList ddsFiles =
+                sourceDir.entryList({ "_reflection_probe*.dds" }, QDir::Files);
+
+            if (ddsFiles.isEmpty())
+            {
                 qWarning() << "No _reflection_probe*.dds files found in" << sourceFolder;
                 return false;
             }
 
-            // Move the DDS files
-            for (const QString& fileName : ddsFiles) {
-                const QString srcPath = sourceFolder + fileName;
-                const QString dstPath = targetFolder + fileName;
+            for (const QString& ddsFile : ddsFiles)
+            {
+                const QString srcPath = sourceFolder + ddsFile;
+                const QString dstPath = targetFolder + ddsFile;
 
-                // If the file exists at destination, remove it
-                if (QFile::exists(dstPath) && !QFile::remove(dstPath)) {
+                // Remove existing DDS at destination
+                if (QFile::exists(dstPath) && !QFile::remove(dstPath))
+                {
                     qWarning() << "Failed to remove existing destination file:" << dstPath;
                     return false;
                 }
 
-                // Move the file
-                if (!QFile::rename(srcPath, dstPath)) {
+                // Move DDS
+                if (!QFile::rename(srcPath, dstPath))
+                {
                     qWarning() << "Failed to move file:" << srcPath << "->" << dstPath;
                     return false;
                 }
-            }
 
-            // Delete any matching .h1Image files
-            const QStringList h1ImageFiles = targetDir.entryList(QStringList() << "_reflection_probe*.h1Image", QDir::Files);
-            for (const QString& fileName : h1ImageFiles) {
-                const QString filePath = targetFolder + fileName;
+                // Remove matching .h1Image
+                const QString h1ImageFile = QFileInfo(ddsFile).completeBaseName() + ".h1Image";
 
-                if (!QFile::remove(filePath)) {
-                    qWarning() << "Failed to delete file:" << filePath;
+                const QString h1ImagePath = targetFolder + h1ImageFile;
+
+                if (QFile::exists(h1ImagePath) && !QFile::remove(h1ImagePath))
+                {
+                    qWarning() << "Failed to delete file:" << h1ImagePath;
                     return false;
                 }
             }
@@ -324,7 +328,7 @@ void generateSettings(QWidget* parent)
     Globals.pathIW3 = findGameFolderInAllDrives("Call of Duty 4");
     Globals.pathIW4 = findGameFolderInAllDrives("Call of Duty Modern Warfare 2");
     Globals.pathIW5 = findGameFolderInAllDrives("Call of Duty Modern Warfare 3");
-    Globals.h1Executable = "h1-mod_dev.exe";
+    Globals.h1Executable = "h1-mod.exe";
     
     saveGlobalsToJson(parent);
 
@@ -374,9 +378,10 @@ void H1ModTools::setupListWidgets()
             qDebug() << "Current H1 item:" << name;
 
             const bool isMap = Funcs::H1::isMap(name);
+            const bool isMapLoad = Funcs::H1::isMapLoad(name);
             ui.compileReflectionsButton->setEnabled(isMap);
             ui.runMapButton->setEnabled(isMap);
-			ui.moveToUsermapsCheckBox->setEnabled(isMap);
+			ui.moveToUsermapsCheckBox->setEnabled(isMap || isMapLoad);
 			ui.mapRunCmdsText->setEnabled(isMap);
             ui.cheatsCheckBox->setEnabled(isMap);
             ui.developerCheckBox->setEnabled(isMap);
@@ -1046,18 +1051,26 @@ void H1ModTools::exportSelection()
     const QString currentSelectedPath = widget->currentItem()->data(0, Qt::UserRole).toString();
     const bool isUserMap = currentSelectedPath.contains("usermaps");
 
+    const QString zone = QFileInfo(currentSelectedText).completeBaseName();
+    const QString zonePath = Funcs::Shared::getGamePath(gameType) + "/zone/english";
+
+    QString usermapPath{};
+    if (isUserMap) {
+        usermapPath = currentSelectedPath;
+    }
+
     // Add a check for map source exporting
     if (gameType == GameType::IW3 && Funcs::IW3::isMapSource(QFileInfo(currentSelectedText).fileName())) {
-        if (!Funcs::Shared::zoneExistsForDump(QFileInfo(currentSelectedText).completeBaseName(), gameType)) {
+        if (!Funcs::Shared::zoneExistsForDump(zone, gameType)) {
             qWarning() << "Map source not built yet for" << currentSelectedText;
             return;
         }
     }
 
     if (isUserMap)
-        qInfo() << "Exporting map" << currentSelectedText;
+        qInfo() << "Exporting map" << zone;
     else
-        qInfo() << "Exporting zone" << currentSelectedText;
+        qInfo() << "Exporting zone" << zone;
 
     const auto showH1WidgetForZone = [this](const QString& zone) {
         const QString sourceFile = Globals.pathH1 + "/zone_source/" + zone + ".csv";
@@ -1070,14 +1083,10 @@ void H1ModTools::exportSelection()
                 treeWidgetH1->scrollToItem(treeWidgetH1->currentItem(), QAbstractItemView::PositionAtCenter);
                 treeWidgetH1->setFocus();
             }
-            else
-            {
-                ui.tabWidget->setCurrentWidget(ui.tabIW3);
-            }
         }
 	};
 
-    const auto dumpZone = [=](const QString& zone, const bool showH1Widget = false) {
+    const auto dumpZone = [=](const QString& zone, std::function<void(bool)> completed_func) {
         disableUiAndStoreState();
 
         QStringList arguments;
@@ -1103,6 +1112,7 @@ void H1ModTools::exportSelection()
             if (status != QProcess::NormalExit || exitCode != 0) {
                 qCritical() << executable << "exited with error during zone export.";
                 restoreUiState();
+                completed_func(false);
                 return;
             }
 
@@ -1110,13 +1120,14 @@ void H1ModTools::exportSelection()
             const QString destFolder = Globals.pathH1 + "/zonetool/" + zone;
             QtUtils::moveDirectory(dumpFolder, destFolder);
 
+            const auto isMap = Funcs::H1::isMap(zone);
             const auto isMpMap = Funcs::H1::isMpMap(zone);
+            const auto isMapLoad = Funcs::H1::isMapLoad(zone);
+
             const QString mapsPrefix = isMpMap ? "maps/mp" : "maps";
             const auto mapEntsPath = QString("%1/zonetool/%2/%3/%2.d3dbsp.ents").arg(Globals.pathH1, zone, mapsPrefix);
 
-            // sanity check map_ents contains necessary values
-            const auto isMap = Funcs::H1::isMap(zone);
-            if (isMap)
+            if (isMap) // sanity check map_ents contains necessary values
             {
                 auto mapEntsRead = MapEntsReader(mapEntsPath);
 
@@ -1144,72 +1155,84 @@ void H1ModTools::exportSelection()
                 }
             }
 
-            if (ui.convertGscCheckBox->isChecked()) {
-                if (isMap)
-                {
-                    const auto isMpMap = Funcs::H1::isMpMap(zone);
-                    const QString mapsPrefix = isMpMap ? "maps/mp" : "maps";
+            if (isMap)
+            {
+                // Copy rawfiles
+                QtUtils::copyDirectory("static/rawfiles/", destFolder);
 
-                    const auto mapEntsRead = MapEntsReader(mapEntsPath);
+                const auto mapEntsRead = MapEntsReader(mapEntsPath);
 
-                    CopyGSCFiles(destFolder); // Copy default GSC files to the zone folder
+                if (ui.convertGscCheckBox->isChecked()) {
+                    // Need to re-write the whole ConvertGSCFiles function etc...
                     ConvertGSCFiles(destFolder, { // Convert GSC files to H1 format
-                        .hasDestructibles = !mapEntsRead.getDestructibles().empty(), 
-                        .hasAnimatedModels = !mapEntsRead.getAnimatedModels().empty(), 
-                        .isMpMap = isMpMap});
-
-                    // Copy template files here, maybe need to change this later
-                    const auto addTemplateFile = [zone](const QString& templatePath, const QString& destFolder, const QString& destFile)
-                    {
-                        if (!QFile::exists(destFolder + destFile)) {
-                            QtUtils::copyFile(templatePath, destFolder + destFile);
-                            QFile::rename(destFolder + QFile(templatePath).fileName(), destFolder + destFile);
-
-							Funcs::Shared::replaceStringInFile(destFolder + destFile, "mapname", zone);
-
-                            return true;
-                        }
-                        return false;
-                    };
-
-                    addTemplateFile("static/templates/vision.vision", destFolder + "/vision/", zone + ".vision");
-                    addTemplateFile("static/templates/_art.gsc", destFolder + "/maps/createart/", zone + "_art.gsc");
-                    addTemplateFile("static/templates/_fog.gsc", destFolder + "/maps/createart/", zone + "_fog.gsc");
-                    addTemplateFile("static/templates/_fog_hdr.gsc", destFolder + "/maps/createart/", zone + "_fog_hdr.gsc");
-                    addTemplateFile("static/templates/_lightsets.csv", destFolder + "/maps/createart/", zone + "_lightsets.csv");
-                    addTemplateFile("static/templates/_lightsets_hdr.csv", destFolder + "/maps/createart/", zone + "_lightsets_hdr.csv");
-
-                    if (!isMpMap)
-                    {
-                        Funcs::Shared::replaceStringInFile(destFolder + "/maps/createart/" + zone + "_fog.gsc", "maps\\mp\\_art::create_vision_set_fog", "maps\\_utility::create_vision_set_fog");
-                        Funcs::Shared::replaceStringInFile(destFolder + "/maps/createart/" + zone + "_fog_hdr.gsc", "maps\\mp\\_art::create_vision_set_fog", "maps\\_utility::create_vision_set_fog");
-                    }
-
-                    // we need to add static/botpathways/ and copy the one for the map if it exists to destFolder/<mapPrefix>
+                        .hasDestructibles = !mapEntsRead.getDestructibles().empty(),
+                        .hasAnimatedModels = !mapEntsRead.getAnimatedModels().empty(),
+                        .isMpMap = isMpMap });
                 }
-                else
+
+                // Copy template files here, maybe need to change this later
+                const auto addTemplateFile = [zone](const QString& templatePath, const QString& destFolder, const QString& destFile)
                 {
-                    ConvertGSCFiles(destFolder, {.isMpMap = Funcs::H1::isMpMap(zone) }); // Convert GSC files to H1 format
+                    if (!QFile::exists(destFolder + destFile)) {
+                        QtUtils::copyFile(templatePath, destFolder + destFile);
+                        QFile::rename(destFolder + QFile(templatePath).fileName(), destFolder + destFile);
+
+                        Funcs::Shared::replaceStringInFile(destFolder + destFile, "mapname", zone);
+
+                        return true;
+                    }
+                    return false;
+                };
+
+                addTemplateFile("static/templates/vision.vision", destFolder + "/vision/", zone + ".vision");
+                addTemplateFile("static/templates/_art.gsc", destFolder + "/maps/createart/", zone + "_art.gsc");
+                addTemplateFile("static/templates/_fog.gsc", destFolder + "/maps/createart/", zone + "_fog.gsc");
+                addTemplateFile("static/templates/_fog_hdr.gsc", destFolder + "/maps/createart/", zone + "_fog_hdr.gsc");
+                addTemplateFile("static/templates/_lightsets.csv", destFolder + "/maps/createart/", zone + "_lightsets.csv");
+                addTemplateFile("static/templates/_lightsets_hdr.csv", destFolder + "/maps/createart/", zone + "_lightsets_hdr.csv");
+
+                if (!isMpMap)
+                {
+                    Funcs::Shared::replaceStringInFile(destFolder + "/maps/createart/" + zone + "_fog.gsc", "maps\\mp\\_art::create_vision_set_fog", "maps\\_utility::create_vision_set_fog");
+                    Funcs::Shared::replaceStringInFile(destFolder + "/maps/createart/" + zone + "_fog_hdr.gsc", "maps\\mp\\_art::create_vision_set_fog", "maps\\_utility::create_vision_set_fog");
                 }
 
-                // move ignore list to dest
-                QtUtils::copyDirectory("static/zone_source/assetlist", destFolder + "/zone_source/assetlist");
+                // copy waypoint files if they exist
+                QStringList waypointPaths = {
+                    QString("static/waypoints/%1_wp.csv").arg(zone),
+                    QString("static/waypoints/%1.csv").arg(zone)
+                };
+
+                for (const QString& path : waypointPaths) {
+                    if (QFile::exists(path)) {
+                        QFile::copy(path, destFolder + "/" + mapsPrefix + "/" + QFileInfo(path).fileName());
+                        break;
+                    }
+                }
 
                 // load <map>.iwd and dump images and sounds folder to destFolder
                 // we need to load dumped csv and get all the image references and try to get them from the raw/images folder
 
-                convertMp3ToFlacForFolder(destFolder + "/sound");
+                //convertMp3ToFlacForFolder(destFolder + "/sound");
                 // move converted sounds to loaded_sound
+            }
+            else {
+                if (ui.convertGscCheckBox->isChecked()) {
+                    ConvertGSCFiles(destFolder, {}); // Convert GSC files to H1 format
+                }
+            }
+
+            if (isMapLoad) {
+                QtUtils::copyFile(destFolder + "/materials/$levelbriefing.json", destFolder + "/materials/$levelbriefingcrossfade.json");
             }
 
             if (ui.generateCsvCheckBox->isChecked()) {
-                generateCSV(zone, destFolder, Funcs::H1::isMpMap(zone), gameType, GameType::H1);
+                generateCSV(zone, destFolder, isMpMap, gameType, GameType::H1);
             }
 
             restoreUiState();
 
-            if (showH1Widget)
-                showH1WidgetForZone(zone);
+            completed_func(true);
         });
 
         process->start();
@@ -1217,20 +1240,63 @@ void H1ModTools::exportSelection()
             qWarning() << "Failed to start process:" << executable;
             process->deleteLater();
             restoreUiState();
+            completed_func(false);
         }
     };
 
     dumpZoneToolAssets();
     // we need to also dump techset zones to zonetool_paths if it's not already done...
 
-    const QString zone = QFileInfo(currentSelectedText).completeBaseName();
-    if (!isUserMap) {
-        // move map.ff and map_load.ff to zone/english
-        dumpZone(zone, true);
-        // dump map load too...
+    if (isUserMap) {
+        const QString zone_ff_path = zonePath + "/" + zone + ".ff";
+        const QString usermap_ff_path = usermapPath + "/" + zone + ".ff";
+        bool cleanAfter = (QFile(zone_ff_path).exists() == false);
+        QtUtils::copyFile(usermap_ff_path, zone_ff_path);
+
+        const auto completed_func = [=](bool success) {
+            if (cleanAfter) {
+                QtUtils::deleteFile(zone_ff_path);
+            }
+            if (success)
+            {
+                // dump map load zone
+                {
+                    const QString zone_load = zone + "_load";
+                    const QString zone_loadff_path = zonePath + "/" + zone_load + ".ff";
+                    const QString usermap_loadff_path = usermapPath + "/" + zone_load + ".ff";
+
+                    if (QFile(usermap_loadff_path).exists()) {
+                        bool cleanAfter = (QFile(zone_loadff_path).exists() == false);
+                        QtUtils::copyFile(usermap_loadff_path, zone_loadff_path);
+
+                        const auto completed_func2 = [=](bool success) {
+                            if (cleanAfter) {
+                                QtUtils::deleteFile(zone_loadff_path);
+                            }
+
+                            showH1WidgetForZone(zone);
+                        };
+
+                        dumpZone(zone_load, completed_func2);
+                    }
+                    else {
+                        showH1WidgetForZone(zone);
+                    }
+                }
+            }
+        };
+
+        // dump map zone
+        dumpZone(zone, completed_func);
     }
     else {
-        dumpZone(zone, true);
+        const auto completed_func = [&](bool success) {
+            if (success)
+            {
+                showH1WidgetForZone(zone);
+            }
+        };
+        dumpZone(zone, completed_func);
     }
 }
 

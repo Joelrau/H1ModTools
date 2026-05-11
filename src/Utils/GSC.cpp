@@ -2,279 +2,369 @@
 
 #include "QTUtils.h"
 
-void CopyGSCFiles(const QString& destinationPath)
+struct FunctionMapping
 {
-	QString sourcePath = "static/rawfiles/";
-	QtUtils::copyDirectory(sourcePath, destinationPath);
+    QString oldName;
+    QString newName;
+    int minArgs = -1;
+    std::function<QString(const QStringList&)> transformer;
+};
+
+struct InsertionRule
+{
+    QString afterCall;
+    QString insertCode;
+};
+
+using RemovalMap = QHash<QString, QSet<QString>>;
+using InsertionMap = QHash<QString, QVector<InsertionRule>>;
+using MappingMap = QHash<QString, FunctionMapping>;
+
+
+//-----------------------------------------------------
+// Parse full function body using brace matching
+//-----------------------------------------------------
+static int FindFunctionEnd(const QString& content, int bodyStart)
+{
+    int depth = 1;
+
+    for (int i = bodyStart; i < content.size(); i++)
+    {
+        switch (content[i].unicode())
+        {
+        case '{': depth++; break;
+        case '}': depth--; break;
+        }
+
+        if (depth == 0)
+            return i + 1;
+    }
+
+    return content.size();
 }
 
-struct FunctionMapping {
-	QString oldName;
-	QString newName;
-	int minArgs = -1;
-	std::function<QString(const QStringList&)> transformer;
-};
 
-struct InsertionRule {
-	QString targetFunction;
-	QString afterCall;
-	QString insertCode;
-};
-
-struct RemovalRule {
-	QString functionName;
-	QStringList functionsToRemove;
-};
-
-QString processFunctionBlock(const QString& functionName, const QString& fullFunctionBlock,
-    const QHash<QString, QVector<QString>>& removeRules,
-    const QVector<InsertionRule>& insertionRules)
+//-----------------------------------------------------
+// Process individual function block
+//-----------------------------------------------------
+static QString ProcessFunctionBlock(
+    const QString& functionName,
+    QStringView block,
+    const RemovalMap& removalRules,
+    const InsertionMap& insertionRules)
 {
-    // fullFunctionBlock contains the full function including signature and braces,
-    // so we need to split out the function header line and the body lines
+    QStringList lines = block.toString().split('\n');
+    QStringList output;
 
-    QStringList lines = fullFunctionBlock.split('\n');
-    QStringList result;
+    const auto removals = removalRules.value(functionName);
+    const auto insertions = insertionRules.value(functionName);
 
-    // Find line with '{' to identify where function body starts
-    int braceLineIndex = -1;
-    int bracePosInLine = -1;
-    for (int i = 0; i < lines.size(); ++i) {
-        int pos = lines[i].indexOf('{');
-        if (pos != -1) {
-            braceLineIndex = i;
-            bracePosInLine = pos;
-            break;
-        }
-    }
+    int braceLine = -1;
 
-    if (braceLineIndex == -1) {
-        // Malformed function block: no opening brace found, return as is
-        return fullFunctionBlock;
-    }
+    for (int i = 0; i < lines.size(); i++)
+    {
+        output << lines[i];
 
-    // Copy function signature lines (up to and including brace line)
-    for (int i = 0; i <= braceLineIndex; ++i) {
-        result << lines[i];
-    }
+        if (braceLine == -1 && lines[i].contains('{'))
+        {
+            braceLine = i;
 
-    bool insertedAtStart = false;
-
-    // Process function body lines, start after brace line
-    for (int i = braceLineIndex + 1; i < lines.size(); ++i) {
-        QString line = lines[i];
-        QString trimmed = line.trimmed();
-
-        // Removal logic: skip lines that contain calls to functions to remove
-        if (removeRules.contains(functionName)) {
-            bool shouldRemove = false;
-            for (const QString& toRemove : removeRules[functionName]) {
-                // Regex: ^funcName\s*\([^;]*\)\s*;?$
-                QRegularExpression pattern("^" + QRegularExpression::escape(toRemove) + R"(\s*\([^;]*\)\s*;?\s*$)");
-                if (pattern.match(trimmed).hasMatch()) {
-                    shouldRemove = true;
-                    break;
-                }
+            // insert immediately after opening brace
+            for (const auto& rule : insertions)
+            {
+                if (rule.afterCall.isEmpty())
+                    output << "    " + rule.insertCode;
             }
-            if (shouldRemove)
-                continue; // skip this line entirely
+
+            continue;
         }
 
-        // Insertion logic
-        bool insertedThisLine = false;
-        for (const auto& rule : insertionRules) {
-            if (rule.targetFunction == functionName) {
-                if (rule.afterCall.isEmpty() && !insertedAtStart) {
-                    // Insert immediately after opening brace line
-                    // Insert only once
-                    result << "    " + rule.insertCode;
-                    insertedAtStart = true;
-                    // continue to process current line normally (don't insert again)
-                }
-                else if (!rule.afterCall.isEmpty()) {
-                    // Insert after a specific call line, e.g. afterCall = "maps\\mp\\_load::main"
-                    // Match call ignoring trailing spaces and optional parentheses with or without ;
-                    // Use regex to detect calls like "maps\mp\_load::main();" or "maps\mp\_load::main ();"
-                    QRegularExpression callPattern("^" + QRegularExpression::escape(rule.afterCall) + R"(\s*\([^)]*\)\s*;?\s*$)");
-                    if (callPattern.match(trimmed).hasMatch()) {
-                        result << line;
-                        result << "    " + rule.insertCode;
-                        insertedThisLine = true;
-                        break;
-                    }
-                }
-            }
-        }
+        if (braceLine == -1)
+            continue;
 
-        if (!insertedThisLine)
-            result << line;
-    }
+        QString trimmed = lines[i].trimmed();
 
-    return result.join('\n');
-}
+        //-------------------------------------------------
+        // Remove function calls
+        //-------------------------------------------------
+        bool removeLine = false;
 
-// Helper function to safely replace function calls globally without messing offsets
-QString transformFunctionCalls(const QString& input, const QVector<FunctionMapping>& mappings)
-{
-    // Pattern: optional "self " + functionName + '(' + args + ')'
-    // Capture groups: 1 = "self " or empty, 2 = function name, 3 = args (inside parentheses)
-    QRegularExpression callPattern(R"((self\s+)?(\w+)\s*\(([^)]*)\))");
-
-    QString output;
-    int lastPos = 0;
-
-    auto it = callPattern.globalMatch(input);
-    while (it.hasNext()) {
-        auto match = it.next();
-
-        output += input.mid(lastPos, match.capturedStart() - lastPos);
-
-        QString object = match.captured(1);
-        QString name = match.captured(2);
-        QStringList args = match.captured(3).split(',', Qt::SkipEmptyParts);
-        for (QString& arg : args)
-            arg = arg.trimmed();
-
-        bool replaced = false;
-        for (const auto& mapping : mappings) {
-            if (mapping.oldName == name && (mapping.minArgs == -1 || mapping.minArgs <= args.size())) {
-                QString replacement;
-                if (mapping.transformer)
-                    replacement = mapping.transformer(args);
-                else
-                    replacement = QString("%1%2(%3)").arg(object).arg(mapping.newName).arg(args.join(", "));
-
-                // Avoid double semicolon if original call ended with one
-                if (!replacement.endsWith(';'))
-                    replacement += ";";
-
-                output += replacement;
-                replaced = true;
+        for (const auto& removeFunc : removals)
+        {
+            if (trimmed.startsWith(removeFunc + "("))
+            {
+                output.removeLast();
+                removeLine = true;
                 break;
             }
         }
 
-        if (!replaced)
-            output += match.captured(0);
+        if (removeLine)
+            continue;
 
+        //-------------------------------------------------
+        // Insert after function calls
+        //-------------------------------------------------
+        for (const auto& rule : insertions)
+        {
+            if (!rule.afterCall.isEmpty() &&
+                trimmed.startsWith(rule.afterCall + "("))
+            {
+                output << "    " + rule.insertCode;
+            }
+        }
+    }
+
+    return output.join('\n');
+}
+
+
+//-----------------------------------------------------
+// Transform function calls globally
+//-----------------------------------------------------
+static QString TransformFunctionCalls(
+    const QString& input,
+    const MappingMap& mappings)
+{
+    static const QRegularExpression callRegex(
+        R"((self\s+)?([A-Za-z0-9_:\\]+)\s*\(([^)]*)\))"
+    );
+
+    QString output;
+    output.reserve(input.size());
+
+    int lastPos = 0;
+
+    auto matches = callRegex.globalMatch(input);
+
+    while (matches.hasNext())
+    {
+        auto match = matches.next();
+
+        output += QStringView(input).mid(lastPos,
+            match.capturedStart() - lastPos);
+
+        const QString selfPrefix = match.captured(1);
+        const QString functionName = match.captured(2);
+
+        if (!mappings.contains(functionName))
+        {
+            output += match.captured(0);
+            lastPos = match.capturedEnd();
+            continue;
+        }
+
+        QStringList args =
+            match.captured(3).split(',', Qt::SkipEmptyParts);
+
+        for (auto& arg : args)
+            arg = arg.trimmed();
+
+        const auto& mapping = mappings[functionName];
+
+        if (mapping.minArgs != -1 &&
+            args.size() < mapping.minArgs)
+        {
+            output += match.captured(0);
+            lastPos = match.capturedEnd();
+            continue;
+        }
+
+        QString replacement;
+
+        if (mapping.transformer)
+        {
+            replacement = mapping.transformer(args);
+        }
+        else
+        {
+            replacement = QString("%1%2(%3)")
+                .arg(selfPrefix)
+                .arg(mapping.newName)
+                .arg(args.join(", "));
+        }
+
+        output += replacement;
         lastPos = match.capturedEnd();
     }
 
-    output += input.mid(lastPos);
+    output += QStringView(input).mid(lastPos);
+
     return output;
 }
 
-// Main function
-void ConvertGSCFile(const QString& gscPath, GSC_Convert_Settings settings)
-{
-    // 1. Setup your mappings and rules
 
-    QVector<FunctionMapping> functionMappings = {
-        { "wait", "Wait", 1, [](const QStringList& args) {
-            if (args.isEmpty()) return QString("Wait();"); // safe fallback
-            return QString("Wait(%1);").arg(args[0]);
-        }}
+//-----------------------------------------------------
+// Main conversion
+//-----------------------------------------------------
+void ConvertGSCFile(
+    const QString& gscPath,
+    const GSC_Convert_Settings& settings)
+{
+    QFile file(gscPath);
+
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+    {
+        qDebug() << "Failed reading:" << gscPath;
+        return;
+    }
+
+    QString content = QTextStream(&file).readAll();
+    file.close();
+
+    //-------------------------------------------------
+    // Build mappings
+    //-------------------------------------------------
+    MappingMap mappings =
+    {
+        {
+            "wait",
+            {
+                "wait",
+                "wait",
+                1,
+                [](const QStringList& args)
+                {
+                    return args.isEmpty()
+                        ? "wait();"
+                        : QString("wait(%1);").arg(args[0]);
+                }
+            }
+        },
+
+        {
+            "maps\\mp\\_utility::createOneshotEffect",
+            {
+                "maps\\mp\\_utility::createOneshotEffect",
+                "common_scripts\\utility::createOneshotEffect"
+            }
+        },
+
+        {
+            "maps\\mp\\_utility::createLoopEffect",
+            {
+                "maps\\mp\\_utility::createLoopEffect",
+                "common_scripts\\utility::createLoopEffect"
+            }
+        }
     };
 
-    // Use QHash for removal rules (functionName -> list of calls to remove)
-    QHash<QString, QVector<QString>> removeRules = {
+    //-------------------------------------------------
+    // Removal rules
+    //-------------------------------------------------
+    RemovalMap removals =
+    {
         { "main", { "setExpFog" } }
     };
 
-    // Build insertion rules dynamically since you use gscPath in it
-    QVector<InsertionRule> insertionRules = {
-    };
+    //-------------------------------------------------
+    // Insertion rules
+    //-------------------------------------------------
+    InsertionMap insertions;
 
-    // 2. Read the whole file content
-    QFile gscFile(gscPath);
-    if (!gscFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        qDebug() << "Failed to open GSC file for reading:" << gscPath;
-        return;
-    }
-    QTextStream in(&gscFile);
-    QString content = in.readAll();
-    gscFile.close();
+    const QString loadName = settings.isMpMap
+        ? "maps\\mp\\_load::main"
+        : "maps\\_load::main";
 
-    const auto loadname = settings.isMpMap ? QString("maps\\mp\\_load::main") : QString("maps\\_load::main");
-    if (content.contains(loadname))
+    if (content.contains(loadName))
     {
+        auto& mainRules = insertions["main"];
+
         if (!content.contains("_art::main()"))
-            insertionRules.append({ "main", "", QString("maps\\createart\\%1_art::main();").arg(QFileInfo(gscPath).baseName()) }); // Insert at start of main()
-        if(settings.hasDestructibles)
-            insertionRules.append({ "main", loadname, 
-                "thread common_scripts\\_destructible::init();" }); // Insert after _load::main()
+        {
+            mainRules.push_back({
+                "",
+                QString("maps\\createart\\%1_art::main();")
+                    .arg(QFileInfo(gscPath).baseName())
+                });
+        }
+
+        if (settings.hasDestructibles)
+            mainRules.push_back({
+                loadName,
+                "thread common_scripts\\_destructible::init();"
+                });
+
         if (settings.hasPipes)
-            insertionRules.append({ "main", loadname,
-                "thread common_scripts\\_pipes::init();" });
-        if(settings.hasAnimatedModels)
-            insertionRules.append({ "main", loadname, settings.isMpMap ? 
-                "thread maps\\mp\\_animatedmodels::main();" : 
-                "thread maps\\_animatedmodels::main();" });
-        if (settings.hasRadiation)
-            insertionRules.append({ "main", loadname, settings.isMpMap ? 
-                "thread maps\\mp\\_radiation::radiation();" :
-                "thread maps\\_radiation::main();" });
-        if(settings.hasMinefields)
-            insertionRules.append({ "main", loadname, 
-				"thread maps\\mp\\_minefields::minefields();" });
+            mainRules.push_back({
+                loadName,
+                "thread common_scripts\\_pipes::init();"
+                });
+
+        if (settings.hasAnimatedModels)
+            mainRules.push_back({
+                loadName,
+                settings.isMpMap
+                    ? "thread maps\\mp\\_animatedmodels::main();"
+                    : "thread maps\\_animatedmodels::main();"
+                });
     }
 
-    // 3. Parse functions and process them individually
-    QRegularExpression functionRegex(R"(^\s*(\w+)\s*\([^)]*\)\s*\n?\s*\{)", QRegularExpression::MultilineOption);
-    QString newContent;
-    int offset = 0;
-    int idx = 0;
+    //-------------------------------------------------
+    // Parse functions
+    //-------------------------------------------------
+    static const QRegularExpression functionRegex(
+        R"(^\s*(\w+)\s*\([^)]*\)\s*\n?\s*\{)",
+        QRegularExpression::MultilineOption
+    );
 
-    while (idx < content.size()) {
-        auto match = functionRegex.match(content, idx);
+    QString output;
+    output.reserve(content.size());
+
+    int offset = 0;
+    int searchPos = 0;
+
+    while (true)
+    {
+        auto match = functionRegex.match(content, searchPos);
+
         if (!match.hasMatch())
             break;
 
-        QString functionName = match.captured(1);
-        int funcStart = match.capturedStart();
-        int bodyStart = match.capturedEnd();
+        const QString functionName = match.captured(1);
+        const int start = match.capturedStart();
+        const int bodyStart = match.capturedEnd();
 
-        // Append content before this function unchanged
-        newContent += content.mid(offset, funcStart - offset);
+        output += QStringView(content).mid(offset, start - offset);
 
-        // Find full function body by matching braces
-        int braceDepth = 1;
-        int pos = bodyStart;
-        while (pos < content.size() && braceDepth > 0) {
-            if (content[pos] == '{') braceDepth++;
-            else if (content[pos] == '}') braceDepth--;
-            pos++;
-        }
+        int end = FindFunctionEnd(content, bodyStart);
 
-        // Extract full function block (signature + body)
-        QString functionBlock = content.mid(funcStart, pos - funcStart);
+        QStringView functionBlock(content.data() + start, end - start);
 
-        // Process removal and insertion inside this function block
-        QString updatedBlock = processFunctionBlock(functionName, functionBlock, removeRules, insertionRules);
+        output += ProcessFunctionBlock(
+            functionName,
+            functionBlock,
+            removals,
+            insertions
+        );
 
-        newContent += updatedBlock;
-
-        offset = pos;
-        idx = pos;
+        offset = end;
+        searchPos = end;
     }
 
-    // Append remaining content after last function
-    newContent += content.mid(offset);
+    output += QStringView(content).mid(offset);
 
-    // 4. Apply function call transformations globally
-    QString transformedContent = transformFunctionCalls(newContent, functionMappings);
+    //-------------------------------------------------
+    // Final transform pass
+    //-------------------------------------------------
+    output = TransformFunctionCalls(output, mappings);
 
-    // 5. Write back to file
-    if (!gscFile.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate)) {
-        qDebug() << "Failed to open GSC file for writing:" << gscPath;
+    //-------------------------------------------------
+    // Write result
+    //-------------------------------------------------
+    if (!file.open(
+        QIODevice::WriteOnly |
+        QIODevice::Text |
+        QIODevice::Truncate))
+    {
+        qDebug() << "Failed writing:" << gscPath;
         return;
     }
 
-    QTextStream out(&gscFile);
-    out << transformedContent;
-    gscFile.close();
+    QTextStream(&file) << output;
+    file.close();
 
-    qDebug() << "Conversion complete for" << gscPath;
+    qDebug() << "Converted:" << gscPath;
 }
 
 QStringList findAllGSCFiles(const QString& root)
