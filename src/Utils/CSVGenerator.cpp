@@ -132,19 +132,6 @@ void generateCSV(const QString& zone, const QString& destFolder, const bool isMp
     addRow({ "addpaths", getAssetsPath(), "false"});
     addEmptyLine();
 
-    if (Funcs::Shared::isMapLoad(zone)) {
-        addAsset("techset", ",2d");
-        addAsset("material", ",$victorybackdrop");
-        addAsset("material", ",$defeatbackdrop");
-        addAsset("material", "$levelbriefing");
-        addAsset("material", "$levelbriefingcrossfade");
-
-        save();
-        return;
-    }
-
-    const auto& map = zone;
-
     const auto isMpZone = isMpMap ? true : zone.contains("_mp") || zone.contains("mp_") ? true : false;
     addComment("Ignore list: this will make zonetool not add assets that already exist in the following zones to the built zone.");
     if (isMpZone)
@@ -161,6 +148,19 @@ void generateCSV(const QString& zone, const QString& destFolder, const bool isMp
         addRow({ "ignore", "assetlist/techsets_common" });
         addEmptyLine();
     }
+
+    if (Funcs::Shared::isMapLoad(zone)) {
+        addAsset("techset", ",2d");
+        addAsset("material", ",$victorybackdrop");
+        addAsset("material", ",$defeatbackdrop");
+        addAsset("material", "$levelbriefing");
+        addAsset("material", "$levelbriefingcrossfade");
+
+        save();
+        return;
+    }
+
+    const auto& map = zone;
 
     if (isMpMap)
     {
@@ -282,6 +282,7 @@ void generateCSV(const QString& zone, const QString& destFolder, const bool isMp
             QString path = rootDir + "/" + name;
             if (QFile::exists(path)) {
                 addAsset("aipaths", name);
+                break;
             }
         }
     };
@@ -338,6 +339,7 @@ void generateCSV(const QString& zone, const QString& destFolder, const bool isMp
         QString compassPath = QString("materials/%1.json").arg(compassName);
         addIfExists({ "// compass" }, compassPath);
         addIfExists({ "material", compassName }, compassPath);
+        addIfExists({ {} }, compassPath);
     }
 
     addIterator("stringtable", "maps/createart/", ".csv", "lightsets");
@@ -382,6 +384,7 @@ void generateCSV(const QString& zone, const QString& destFolder, const bool isMp
     auto animated_models = mapEntsRead.getAnimatedModels();
     if (!animated_models.isEmpty()) {
         addGsc(QString("%1/_animatedmodels.gsc").arg(mapPrefix));
+		QVector<QString> addedScripts;
 
         for (auto& animated_model : animated_models) {
             if (!animated_model.precacheScript.isEmpty()) {
@@ -393,6 +396,10 @@ void generateCSV(const QString& zone, const QString& destFolder, const bool isMp
                     addAsset("model", it.key());
                     addAsset("xanim", it.value());
                 }
+            }
+            else {
+                qWarning() << "Animated model" << animated_model.model << "is missing precache script!";
+				addAsset("model", animated_model.model);
             }
         }
 
@@ -409,7 +416,49 @@ void generateCSV(const QString& zone, const QString& destFolder, const bool isMp
         // how tf do we add the assets required by destructibles?? just iterating all is wasteful...
     }
 
-    // we need to parse the map gsc for precacheModel and ambientPlay/playSounds?
+    const auto addAssetsLoaded = [&](const QString& assetType)
+    {
+        std::unordered_set<QString> generated;
+
+        // collect already-generated assets
+        for (const auto& row : csv.rows()) {
+            if (row.count() <= 1 || row[0] != assetType)
+                continue;
+
+            generated.insert(row[1]);
+        }
+
+        const auto csvFilePath = Funcs::Shared::getGamePath(targetGameType) + "/zonetool/" + zone + "/" + zone + ".csv";
+        CSV csvZone{};
+        csvZone.readFile(csvFilePath);
+
+        // add missing assets from loaded zone CSV
+        for (CSV::Row row : csvZone.rows()) {
+            if (row.count() <= 1 || row[0] != assetType)
+                continue;
+
+            // remove reference from asset
+            if (row.count() >= 3 && row[1].isEmpty() && !row[2].isEmpty()) {
+                row[1] = std::move(row[2]);
+                row.erase(row.begin() + 2);
+            }
+            
+            if (!generated.contains(row[1])) {
+                addRow(row);
+            }
+        }
+
+        // add empty line
+        if (csv.rowCount() && !(csv.rows()[csv.rowCount() - 1]).isEmpty()) {
+            addEmptyLine();
+        }
+    };
+
+    // add all rawfiles that were loaded in the zone
+    addAssetsLoaded("rawfile");
+    addAssetsLoaded("sound");
+    addAssetsLoaded("xmodel");
+    addAssetsLoaded("xanim");
 
     qInfo() << "Adding map assets...";
 
