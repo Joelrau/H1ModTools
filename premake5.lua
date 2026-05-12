@@ -48,7 +48,7 @@ project "H1ModTools"
 
     debugdir "%{cfg.targetdir}"
 
-    files { "src/**.h", "src/**.cpp", "src/**.ts", "src/**.ui", "src/**.qrc" }
+    files { "src/**.h", "src/**.cpp", "src/**.ts", "src/**.ui", "src/**.qrc", "src/**.rc" }
 
     local rootPath = path.getabsolute(".")
 
