@@ -4,6 +4,7 @@
 #include "ui_H1ModTools.h"
 
 #include "LogRedirector.h"
+#include "ProcessRunner.h"
 
 class H1ModTools : public QMainWindow
 {
@@ -40,6 +41,8 @@ private slots:
 private:
     Ui::H1ModToolsClass ui;
     std::unique_ptr<LogRedirector> logger;
+
+	ProcessRunner m_runner;
 
     QTreeWidget* treeWidgetH1 = nullptr;
     QTreeWidget* treeWidgetIW3 = nullptr;
