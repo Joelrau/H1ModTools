@@ -1,0 +1,83 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build Release
+    runs-on: windows-latest
+    steps:
+      - name: Check out files
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.*'
+          arch: win64_msvc2022_64
+          cache: true
+
+      - name: Set QTDIR for premake
+        shell: pwsh
+        run: |
+          # premake5.lua expects QTDIR to be the Qt root containing "6.x.y/msvcXXXX_64"
+          $qtRoot = (Get-Item $env:QT_ROOT_DIR).Parent.Parent.FullName
+          "QTDIR=$qtRoot" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Add msbuild to PATH
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Generate project files
+        run: tools\premake5.exe vs2022
+
+      - name: Build
+        run: msbuild build\H1ModTools.sln /m /v:minimal /p:Configuration=Release /p:Platform=x64
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $bin = "build/bin/Release"
+          Get-ChildItem $bin -Recurse -Include *.pdb, *.ilk, *.exp, *.lib | Remove-Item -Force
+          Compress-Archive -Path "$bin/*" -DestinationPath H1ModTools.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: H1ModTools
+          path: H1ModTools.zip
+
+      - name: Move latest tag
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -f latest
+          git push -f origin latest
+
+      - name: Update latest release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Latest Build
+          prerelease: true
+          body: |
+            Automatic build of ${{ github.sha }}
+          files: H1ModTools.zip
+
+permissions:
+  contents: write
