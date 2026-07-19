@@ -2,6 +2,9 @@
 #include "MapEnts.h"
 #include "CSV.h"
 
+#include <unordered_set>
+#include <utility>
+
 QSet<QString> parseCreateFxGsc(const QString& data)
 {
     QSet<QString> sounds;

@@ -2,6 +2,8 @@
 
 #include "QTUtils.h"
 
+#include <functional>
+
 struct FunctionMapping
 {
     QString oldName;

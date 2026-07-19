@@ -2,6 +2,8 @@
 
 #include "Globals.h"
 
+#include <functional>
+
 class ProcessRunner : public QObject
 {
     Q_OBJECT
